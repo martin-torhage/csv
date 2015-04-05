@@ -1,10 +1,20 @@
 -module(erlcsv_parser).
 -on_load(init_nif/0).
 
--export([world/0]).
+-export([init/0,
+         close/1,
+         parse/2]).
 
-world() ->
-      "NIF library not loaded".
+init() ->
+    nif_not_loaded.
+
+close(_) ->
+    nif_not_loaded.
+
+parse(_, _) ->
+    nif_not_loaded.
+
+%% Internal
 
 init_nif() ->
     ok = erlang:load_nif("./priv/erlcsv_parser_nif", 0).
