@@ -6,12 +6,6 @@
 #define MAX_COLS 100
 #define MAX_ROWS 1000
 
-/* struct writer_state { */
-/*   int put_comma; */
-/*   char buffer[INPUT_BUFFER_LEN]; */
-/*   int buffer_pointer; */
-/* }; */
-
 struct output_row {
   ErlNifBinary cols[MAX_COLS];
   int col_offset;
@@ -31,24 +25,6 @@ static ERL_NIF_TERM world(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     return enif_make_string(env, "Hello world!", ERL_NIF_LATIN1);
 }
 
-/* void cb1 (void *s, size_t i, void *void_state) { */
-/*   struct writer_state *state; */
-/*   state = (struct writer_state*) void_state; */
-/*   if ((*state).put_comma) { */
-/*     (*state).buffer[ (*state).buffer_pointer++ ] = ','; */
-/*   } */
-/*   strncpy((*state).buffer + (*state).buffer_pointer, s, i); */
-/*   (*state).buffer_pointer += i; */
-/*   (*state).put_comma = 1; */
-/* } */
-
-/* void cb2 (int c, void *void_state) { */
-/*   struct writer_state *state; */
-/*   state = (struct writer_state*) void_state; */
-/*   (*state).put_comma = 0; */
-/*   (*state).buffer[ (*state).buffer_pointer++ ] = '\n'; */
-/* } */
-
 static void add_value(void *s, int size, struct output* out) {
   struct output_row *row = &(*out).rows[ (*out).row_offset ];
   ErlNifBinary *value;
@@ -64,6 +40,18 @@ static void add_row(struct output* out) {
   (*row).col_offset = 0;
 }
 
+void cb1 (void *s, size_t i, void *out_void) {
+  struct output *out;
+  out = (struct output*) out_void;
+  add_value(s, i, out);
+}
+
+void cb2 (int c, void *out_void) {
+  struct output *out;
+  out = (struct output*) out_void;
+  add_row(out);
+}
+
 static ERL_NIF_TERM output_row(ErlNifEnv* env, struct output_row *row) {
   int cols_n = (*row).col_offset;
   ERL_NIF_TERM out_cols[cols_n];
@@ -75,7 +63,7 @@ static ERL_NIF_TERM output_row(ErlNifEnv* env, struct output_row *row) {
 }
 
 static ERL_NIF_TERM make_output(ErlNifEnv* env, struct output *out) {
-  int rows_n = (*out).row_offset + 1;
+  int rows_n = (*out).row_offset;
   ERL_NIF_TERM out_rows[rows_n];
   int i;
   for (i = 0; i < rows_n; i++) {
@@ -93,8 +81,8 @@ static ERL_NIF_TERM make_output(ErlNifEnv* env, struct output *out) {
 
 static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-  ErlNifBinary csv, ret;
-  //struct csv_parser p;
+  ErlNifBinary csv;
+  struct csv_parser p;
   //int i;
   //char c;
   //ERL_NIF_TERM out_terms[4];
@@ -110,13 +98,13 @@ static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   /* strcpy(ret.data, "HELLO"); */
   /* strcat(ret.data, csv.data); */
   //(*state).put_comma = 0;
-
-  /* csv_init(&p, 0); */
-  /* if (csv_parse(&p, csv.data, csv.size, cb1, cb2, state) != 1) { */
-  /*   return enif_make_badarg(env); */
-  /* } */
-  /* csv_fini(&p, cb1, cb2, state); */
-  /* csv_free(&p); */
+  csv_init(&p, 0);
+  if (csv_parse(&p, csv.data, (size_t) csv.size, cb1, cb2, out) != csv.size) {
+    return enif_make_string(env, csv_strerror(csv_error(&p)), ERL_NIF_LATIN1);
+    // return enif_make_badarg(env);
+  }
+  csv_fini(&p, cb1, cb2, out);
+  csv_free(&p);
 
   //out_terms[0] = enif_make_string(env, "Tjossna", ERL_NIF_LATIN1);
   /* out_terms[1] = enif_make_string(env, "hopssna", ERL_NIF_LATIN1); */
@@ -129,11 +117,11 @@ static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   /*                       enif_make_string(env, "gummisnopp!", ERL_NIF_LATIN1)); */
 
   //return enif_make_binary(env, &ret);
-  add_value("add_value", 9, out);
-  add_value("add_value2", 10, out);
-  add_row(out);
-  add_value("more value", 10, out);
-  add_value("more value2", 11, out);
+  /* add_value("add_value", 9, out); */
+  /* add_value("add_value2", 10, out); */
+  /* add_row(out); */
+  /* add_value("more value", 10, out); */
+  /* add_value("more value2", 11, out); */
   return make_output(env, out);
 }
 
