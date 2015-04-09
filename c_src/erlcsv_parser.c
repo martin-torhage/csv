@@ -38,14 +38,14 @@ static void add_row(struct output* out) {
   (*row).col_offset = 0;
 }
 
-void cb1 (void *s, size_t i, void *out_void) {
+void column_callback (void *s, size_t i, void *out_void) {
   struct output *out;
   printf("%.*s\t", i, s);
   out = (struct output*) out_void;
   add_value(s, i, out);
 }
 
-void cb2 (int c, void *out_void) {
+void row_callback (int c, void *out_void) {
   struct output *out;
   printf("\tNL\r\n");
   out = (struct output*) out_void;
@@ -68,15 +68,8 @@ static ERL_NIF_TERM make_output(ErlNifEnv* env, struct output *out) {
   ERL_NIF_TERM out_rows[rows_n];
   int i;
   for (i = 0; i < rows_n; i++) {
-    //out_rows[i] = enif_make_binary(env, &(*out).rows[i].cols[0]);
     out_rows[i] = output_row(env, &(*out).rows[i]);
-    //out_terms[0] = enif_make_string(env, "Hejpna", ERL_NIF_LATIN1);
   }
-
-  /* out_terms[0] = enif_make_binary(env, &(*out).rows[0].cols[0]); */
-  /* out_terms[1] = enif_make_binary(env, &(*out).rows[0].cols[1]); */
-  /* out_terms[2] = enif_make_binary(env, &(*out).rows[1].cols[0]); */
-  /* out_terms[3] = enif_make_binary(env, &(*out).rows[1].cols[1]); */
   printf("make_output, rows: %d\r\n", rows_n);
   return enif_make_list_from_array(env, out_rows, rows_n);
 }
@@ -104,7 +97,7 @@ static ERL_NIF_TERM close(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   }
 
   init_output(out);
-  csv_fini(parser, cb1, cb2, out);
+  csv_fini(parser, column_callback, row_callback, out);
   return make_output(env, out);
 }
 
@@ -129,8 +122,11 @@ static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   }
 
   init_output(out);
-  if (csv_parse(parser, csv.data, (size_t) csv.size, cb1, cb2, out) != csv.size) {
-    return enif_make_string(env, csv_strerror(csv_error(parser)), ERL_NIF_LATIN1);
+  if (csv_parse(parser, csv.data, (size_t) csv.size,
+                column_callback, row_callback, out) != csv.size) {
+    return enif_make_string(env,
+                            csv_strerror(csv_error(parser)),
+                            ERL_NIF_LATIN1);
   }
   return make_output(env, out);
 }
@@ -154,7 +150,8 @@ static int load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 {
   // Use ERL_NIF_RT_TAKEOVER?
   int flags = ERL_NIF_RT_CREATE;
-  parser_type = enif_open_resource_type(env, NULL, "parser", parser_dtor, flags, NULL);
+  parser_type = enif_open_resource_type(env, NULL, "parser",
+                                        parser_dtor, flags, NULL);
   if (parser_type == NULL) {
     return 1;
   } else {
