@@ -16,13 +16,11 @@ struct output {
   int row_offset;
 };
 
+ErlNifResourceType* parser_type;
+
 static void init_output(struct output *out) {
   (*out).row_offset = 0;
-}
-
-static ERL_NIF_TERM world(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
-{
-    return enif_make_string(env, "Hello world!", ERL_NIF_LATIN1);
+  (*out).rows[0].col_offset = 0;
 }
 
 static void add_value(void *s, int size, struct output* out) {
@@ -42,12 +40,14 @@ static void add_row(struct output* out) {
 
 void cb1 (void *s, size_t i, void *out_void) {
   struct output *out;
+  printf("%.*s\t", i, s);
   out = (struct output*) out_void;
   add_value(s, i, out);
 }
 
 void cb2 (int c, void *out_void) {
   struct output *out;
+  printf("\tNL\r\n");
   out = (struct output*) out_void;
   add_row(out);
 }
@@ -59,6 +59,7 @@ static ERL_NIF_TERM output_row(ErlNifEnv* env, struct output_row *row) {
   for (i = 0; i < cols_n; i++) {
     out_cols[i] = enif_make_binary(env, &((*row).cols[i]));
   }
+  printf("output_row, cols: %d\r\n", cols_n);
   return enif_make_list_from_array(env, out_cols, cols_n);
 }
 
@@ -76,59 +77,89 @@ static ERL_NIF_TERM make_output(ErlNifEnv* env, struct output *out) {
   /* out_terms[1] = enif_make_binary(env, &(*out).rows[0].cols[1]); */
   /* out_terms[2] = enif_make_binary(env, &(*out).rows[1].cols[0]); */
   /* out_terms[3] = enif_make_binary(env, &(*out).rows[1].cols[1]); */
+  printf("make_output, rows: %d\r\n", rows_n);
   return enif_make_list_from_array(env, out_rows, rows_n);
+}
+
+static ERL_NIF_TERM init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+  ERL_NIF_TERM ret;
+  struct csv_parser* parser = enif_alloc_resource(parser_type,
+                                                  sizeof(struct csv_parser));
+  csv_init(parser, 0);
+  ret = enif_make_resource(env, parser);
+  enif_release_resource(parser);
+  return ret;
+}
+
+static ERL_NIF_TERM close(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  struct csv_parser* parser;
+  struct output *out = malloc(sizeof(struct output));
+
+  if (argc != 1) {
+    return enif_make_badarg(env);
+  }
+  if (!enif_get_resource(env, argv[0], parser_type, (void**) &parser)) {
+    return enif_make_badarg(env);
+  }
+
+  init_output(out);
+  csv_fini(parser, cb1, cb2, out);
+  return make_output(env, out);
 }
 
 static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
   ErlNifBinary csv;
-  struct csv_parser p;
-  //int i;
-  //char c;
-  //ERL_NIF_TERM out_terms[4];
+  struct csv_parser* parser;
   struct output *out = malloc(sizeof(struct output));
 
-  init_output(out);
-  // struct writer_state *state = malloc(sizeof(struct writer_state));
-
-  if(!enif_inspect_binary(env, argv[0], &csv)) return enif_make_badarg(env);
-  if(csv.size > INPUT_BUFFER_LEN) return enif_make_badarg(env);
-
-  /* enif_alloc_binary(5 + csv.size, &ret); */
-  /* strcpy(ret.data, "HELLO"); */
-  /* strcat(ret.data, csv.data); */
-  //(*state).put_comma = 0;
-  csv_init(&p, 0);
-  if (csv_parse(&p, csv.data, (size_t) csv.size, cb1, cb2, out) != csv.size) {
-    return enif_make_string(env, csv_strerror(csv_error(&p)), ERL_NIF_LATIN1);
-    // return enif_make_badarg(env);
+  if (argc != 2) {
+    return enif_make_badarg(env);
   }
-  csv_fini(&p, cb1, cb2, out);
-  csv_free(&p);
+  if (!enif_get_resource(env, argv[0], parser_type, (void**) &parser)) {
+    return enif_make_badarg(env);
+  }
 
-  //out_terms[0] = enif_make_string(env, "Tjossna", ERL_NIF_LATIN1);
-  /* out_terms[1] = enif_make_string(env, "hopssna", ERL_NIF_LATIN1); */
-  /* out_terms[2] = enif_make_string(env, "theheh", ERL_NIF_LATIN1); */
+  if (!enif_inspect_binary(env, argv[1], &csv)) {
+    return enif_make_badarg(env);
+  }
+  if (csv.size > INPUT_BUFFER_LEN) {
+    return enif_make_badarg(env);
+  }
 
-  //return enif_make_list_from_array(env, out_terms, 1);
-  /* return enif_make_list(env, 3, */
-  /*                       enif_make_string(env, "Hej", ERL_NIF_LATIN1), */
-  /*                       enif_make_string(env, "hopp", ERL_NIF_LATIN1), */
-  /*                       enif_make_string(env, "gummisnopp!", ERL_NIF_LATIN1)); */
-
-  //return enif_make_binary(env, &ret);
-  /* add_value("add_value", 9, out); */
-  /* add_value("add_value2", 10, out); */
-  /* add_row(out); */
-  /* add_value("more value", 10, out); */
-  /* add_value("more value2", 11, out); */
+  init_output(out);
+  if (csv_parse(parser, csv.data, (size_t) csv.size, cb1, cb2, out) != csv.size) {
+    return enif_make_string(env, csv_strerror(csv_error(parser)), ERL_NIF_LATIN1);
+  }
   return make_output(env, out);
 }
 
 static ErlNifFunc nif_funcs[] =
 {
-  {"world", 0, world},
-  {"parse", 1, parse}
+  {"init", 0, init},
+  {"close", 1, close},
+  {"parse", 2, parse},
 };
 
-ERL_NIF_INIT(erlcsv_parser, nif_funcs, NULL, NULL, NULL, NULL)
+
+void parser_dtor(ErlNifEnv* env, void* obj)
+{
+  struct csv_parser* parser = (struct csv_parser*) obj;
+  printf("dtor!!\n");
+  csv_free(parser);
+}
+
+static int load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
+{
+  // Use ERL_NIF_RT_TAKEOVER?
+  int flags = ERL_NIF_RT_CREATE;
+  parser_type = enif_open_resource_type(env, NULL, "parser", parser_dtor, flags, NULL);
+  if (parser_type == NULL) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+ERL_NIF_INIT(erlcsv_parser, nif_funcs, load, NULL, NULL, NULL)
