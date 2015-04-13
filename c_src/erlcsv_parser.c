@@ -6,6 +6,10 @@
 #define MAX_COLS 100
 #define MAX_ROWS 1000
 
+struct state {
+  struct csv_parser parser;
+};
+
 struct output_row {
   ErlNifBinary cols[MAX_COLS];
   int col_offset;
@@ -16,7 +20,7 @@ struct output {
   int row_offset;
 };
 
-ErlNifResourceType* parser_type;
+ErlNifResourceType* state_type;
 
 static void init_output(struct output *out) {
   (*out).row_offset = 0;
@@ -76,43 +80,48 @@ static ERL_NIF_TERM make_output(ErlNifEnv* env, struct output *out) {
 
 static ERL_NIF_TERM init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   ERL_NIF_TERM ret;
-  struct csv_parser* parser = enif_alloc_resource(parser_type,
-                                                  sizeof(struct csv_parser));
-  csv_init(parser, 0);
-  ret = enif_make_resource(env, parser);
-  enif_release_resource(parser);
+  struct state* state_ptr = enif_alloc_resource(state_type,
+                                                sizeof(struct state));
+  struct csv_parser *parser_ptr = &((*state_ptr).parser);
+  csv_init(parser_ptr, 0);
+  ret = enif_make_resource(env, parser_ptr);
+  enif_release_resource(state_ptr);
   return ret;
 }
 
 static ERL_NIF_TERM close(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-  struct csv_parser* parser;
+  struct state *state_ptr;
+  struct csv_parser *parser_ptr;
   struct output *out = malloc(sizeof(struct output));
 
   if (argc != 1) {
     return enif_make_badarg(env);
   }
-  if (!enif_get_resource(env, argv[0], parser_type, (void**) &parser)) {
+  if (!enif_get_resource(env, argv[0], state_type, (void**) &state_ptr)) {
     return enif_make_badarg(env);
   }
+  parser_ptr = &((*state_ptr).parser);
 
   init_output(out);
-  csv_fini(parser, column_callback, row_callback, out);
+  csv_fini(parser_ptr, column_callback, row_callback, out);
   return make_output(env, out);
 }
 
 static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
   ErlNifBinary csv;
-  struct csv_parser* parser;
+  struct state *state_ptr;
+  struct csv_parser *parser_ptr;
   struct output *out = malloc(sizeof(struct output));
 
   if (argc != 2) {
     return enif_make_badarg(env);
   }
-  if (!enif_get_resource(env, argv[0], parser_type, (void**) &parser)) {
+  if (!enif_get_resource(env, argv[0], state_type, (void**) &state_ptr)) {
     return enif_make_badarg(env);
   }
+  parser_ptr = &((*state_ptr).parser);
 
   if (!enif_inspect_binary(env, argv[1], &csv)) {
     return enif_make_badarg(env);
@@ -122,10 +131,10 @@ static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   }
 
   init_output(out);
-  if (csv_parse(parser, csv.data, (size_t) csv.size,
+  if (csv_parse(parser_ptr, csv.data, (size_t) csv.size,
                 column_callback, row_callback, out) != csv.size) {
     return enif_make_string(env,
-                            csv_strerror(csv_error(parser)),
+                            csv_strerror(csv_error(parser_ptr)),
                             ERL_NIF_LATIN1);
   }
   return make_output(env, out);
@@ -139,20 +148,21 @@ static ErlNifFunc nif_funcs[] =
 };
 
 
-void parser_dtor(ErlNifEnv* env, void* obj)
+void state_dtor(ErlNifEnv* env, void* obj_ptr)
 {
-  struct csv_parser* parser = (struct csv_parser*) obj;
-  printf("dtor!!\n");
-  csv_free(parser);
+  struct state* state_ptr = (struct state*) obj_ptr;
+  struct csv_parser *parser_ptr = &((*state_ptr).parser);
+  printf("dtor!!\r\n");
+  csv_free(parser_ptr);
 }
 
 static int load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 {
   // Use ERL_NIF_RT_TAKEOVER?
   int flags = ERL_NIF_RT_CREATE;
-  parser_type = enif_open_resource_type(env, NULL, "parser",
-                                        parser_dtor, flags, NULL);
-  if (parser_type == NULL) {
+  state_type = enif_open_resource_type(env, NULL, "state",
+                                       state_dtor, flags, NULL);
+  if (state_type == NULL) {
     return 1;
   } else {
     return 0;
