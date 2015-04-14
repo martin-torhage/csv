@@ -1,8 +1,8 @@
 %% -*-erlang-*-
 {application,
- erlcsv,
+ csv,
  [{description,
-   "Parses CSV"},
+   "CSV parser using libcsv in NIF"},
   {vsn, "0.1.0"},
   {modules, []},
   {registered, []},

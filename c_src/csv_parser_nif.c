@@ -193,4 +193,4 @@ static int load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
   }
 }
 
-ERL_NIF_INIT(erlcsv_parser, nif_funcs, load, NULL, NULL, NULL)
+ERL_NIF_INIT(csv_parser, nif_funcs, load, NULL, NULL, NULL)
