@@ -1,4 +1,4 @@
--module(erlcsv_parser).
+-module(csv_parser).
 -on_load(init_nif/0).
 
 -export([init/0,
@@ -17,4 +17,4 @@ parse(_, _) ->
 %% Internal
 
 init_nif() ->
-    ok = erlang:load_nif("./priv/erlcsv_parser_nif", 0).
+    ok = erlang:load_nif("./priv/csv_parser_nif", 0).

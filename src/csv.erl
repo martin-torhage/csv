@@ -1,4 +1,4 @@
--module(erlcsv).
+-module(csv).
 -export([testa/0]).
 
 testa() ->
