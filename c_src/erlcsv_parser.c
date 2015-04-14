@@ -3,16 +3,16 @@
 #include "csv.h"
 
 #define INPUT_BUFFER_LEN 4096
-#define MAX_COLS 100
-#define MAX_ROWS 1000
+#define MAX_COLS 4096
+#define MAX_ROWS 4096
 
 struct row_buffer {
-  ErlNifBinary* cols[4096];
+  ErlNifBinary* cols[MAX_COLS];
   int col_n;
 };
 
 struct out_buffer {
-  ERL_NIF_TERM rows[4096];
+  ERL_NIF_TERM rows[MAX_ROWS];
   int row_n;
 };
 
@@ -29,42 +29,39 @@ struct callback_state {
 
 ErlNifResourceType* state_type;
 
-static void add_value(void *s, int size, struct callback_state* cb_state_ptr) {
-  struct row_buffer row_buffer = (*(*cb_state_ptr).row_buffer_ptr);
-  ErlNifBinary *store = row_buffer.cols[row_buffer.col_n];
-  enif_alloc_binary(size, store);
-  (*store).size = size;
-  memcpy((*store).data, s, size);
-  row_buffer.col_n++;
+static void add_value(void *data_ptr, int size, struct callback_state* cb_state_ptr) {
+  struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
+  ErlNifBinary *store_ptr = row_buffer_ptr->cols[ row_buffer_ptr->col_n ];
+  enif_alloc_binary(size, store_ptr);
+  (*store_ptr).size = size;
+  memcpy((*store_ptr).data, data_ptr, size);
+  (*row_buffer_ptr).col_n++;
 }
 
 static void add_row(struct callback_state* cb_state_ptr) {
-  struct out_buffer out_buffer = (*cb_state_ptr).out_buffer;
-  struct row_buffer row_buffer = (*(*cb_state_ptr).row_buffer_ptr);
-  ErlNifEnv* env_ptr = (*cb_state_ptr).env;
-  ERL_NIF_TERM cols[row_buffer.col_n];
+  struct out_buffer *out_buffer_ptr = &(cb_state_ptr->out_buffer);
+  struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
+  ErlNifEnv* env_ptr = cb_state_ptr->env;
+  ERL_NIF_TERM cols[row_buffer_ptr->col_n];
   int i;
-  int col_n = row_buffer.col_n;
+  int col_n = row_buffer_ptr->col_n;
   for (i = 0; i < col_n; i++) {
     cols[i] = enif_make_binary(env_ptr,
-                               row_buffer.cols[i]);
+                               row_buffer_ptr->cols[i]);
   }
-  row_buffer.col_n = 0;
-  out_buffer.rows[out_buffer.row_n] = enif_make_list_from_array(env_ptr,
-                                                                cols,
-                                                                col_n);
-  out_buffer.row_n++;
+  row_buffer_ptr->col_n = 0;
+  out_buffer_ptr->rows[out_buffer_ptr->row_n] =
+    enif_make_list_from_array(env_ptr, cols, col_n);
+  out_buffer_ptr->row_n++;
 }
 
-void column_callback (void *s, size_t size, void *cb_state_void_ptr) {
-  printf("%.*s\t", (int) size, s);
-  add_value(s,
+void column_callback (void *data_ptr, size_t size, void *cb_state_void_ptr) {
+  add_value(data_ptr,
             size,
             (struct callback_state*) cb_state_void_ptr);
 }
 
 void row_callback (int c, void *cb_state_void_ptr) {
-  printf("\tNL\r\n");
   add_row((struct callback_state*) cb_state_void_ptr);
 }
 
@@ -77,10 +74,18 @@ static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr) {
   return ret;
 }
 
+void init_row_buffer(struct row_buffer *row_buffer_ptr) {
+  int i;
+  for (i = 0; i < MAX_COLS; i++) {
+    row_buffer_ptr->cols[i] = enif_alloc(sizeof(ErlNifBinary*));
+  }
+  row_buffer_ptr->col_n = 0;
+}
+
 static struct state* init_state() {
   struct state* state_ptr = enif_alloc_resource(state_type,
                                                 sizeof(struct state));
-  (*state_ptr).row_buffer.col_n = 0;
+  init_row_buffer(&state_ptr->row_buffer);
   return state_ptr;
 }
 
@@ -141,16 +146,13 @@ static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     return enif_make_badarg(env);
   }
 
-  printf("before init callback state\r\n");
   init_callback_state(&cb_state, env, state_ptr);
-  printf("before parse\r\n");
   if (csv_parse(parser_ptr, csv.data, (size_t) csv.size,
                 column_callback, row_callback, &cb_state) != csv.size) {
     return enif_make_string(env,
                             csv_strerror(csv_error(parser_ptr)),
                             ERL_NIF_LATIN1);
   }
-  printf("before make output\r\n");
   return make_output(&cb_state);
 }
 
@@ -161,11 +163,11 @@ static ErlNifFunc nif_funcs[] =
   {"parse", 2, parse},
 };
 
-
 void free_row_buffer(struct row_buffer buf) {
   int i;
   for (i = 0; i < buf.col_n; i++) {
     enif_release_binary(buf.cols[i]);
+    enif_free(buf.cols[i]);
   }
 }
 
@@ -174,10 +176,8 @@ void state_dtor(ErlNifEnv* env, void* obj_ptr)
   struct state* state_ptr = (struct state*) obj_ptr;
   struct csv_parser *parser_ptr = &((*state_ptr).parser);
   struct row_buffer row_buffer = (*state_ptr).row_buffer;
-  printf("dtor!!\r\n");
   csv_free(parser_ptr);
   free_row_buffer(row_buffer);
-  printf("done\r\n");
 }
 
 static int load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
