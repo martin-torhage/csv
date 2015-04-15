@@ -5,9 +5,15 @@
 #define INPUT_BUFFER_LEN 4096
 #define MAX_COLS 4096
 #define MAX_ROWS 4096
+#define MAX_COL_LEN 1024
+
+struct column {
+  char data[MAX_COL_LEN];
+  int size;
+};
 
 struct row_buffer {
-  ErlNifBinary* cols[MAX_COLS];
+  struct column cols[MAX_COLS];
   int col_n;
 };
 
@@ -31,10 +37,9 @@ ErlNifResourceType* state_type;
 
 static void add_value(void *data_ptr, int size, struct callback_state* cb_state_ptr) {
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
-  ErlNifBinary *store_ptr = row_buffer_ptr->cols[ row_buffer_ptr->col_n ];
-  enif_alloc_binary(size, store_ptr);
-  (*store_ptr).size = size;
-  memcpy((*store_ptr).data, data_ptr, size);
+  struct column *column_ptr = &row_buffer_ptr->cols[row_buffer_ptr->col_n];
+  column_ptr->size = size;
+  memcpy(&column_ptr->data, data_ptr, size);
   (*row_buffer_ptr).col_n++;
 }
 
@@ -46,8 +51,10 @@ static void add_row(struct callback_state* cb_state_ptr) {
   int i;
   int col_n = row_buffer_ptr->col_n;
   for (i = 0; i < col_n; i++) {
-    cols[i] = enif_make_binary(env_ptr,
-                               row_buffer_ptr->cols[i]);
+    cols[i] = enif_make_string_len(env_ptr,
+                                   (char *) &row_buffer_ptr->cols[i].data,
+                                   row_buffer_ptr->cols[i].size,
+                                   ERL_NIF_LATIN1);
   }
   row_buffer_ptr->col_n = 0;
   out_buffer_ptr->rows[out_buffer_ptr->row_n] =
@@ -75,10 +82,6 @@ static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr) {
 }
 
 void init_row_buffer(struct row_buffer *row_buffer_ptr) {
-  int i;
-  for (i = 0; i < MAX_COLS; i++) {
-    row_buffer_ptr->cols[i] = enif_alloc(sizeof(ErlNifBinary*));
-  }
   row_buffer_ptr->col_n = 0;
 }
 
@@ -163,21 +166,11 @@ static ErlNifFunc nif_funcs[] =
   {"parse", 2, parse},
 };
 
-void free_row_buffer(struct row_buffer buf) {
-  int i;
-  for (i = 0; i < buf.col_n; i++) {
-    enif_release_binary(buf.cols[i]);
-    enif_free(buf.cols[i]);
-  }
-}
-
 void state_dtor(ErlNifEnv* env, void* obj_ptr)
 {
   struct state* state_ptr = (struct state*) obj_ptr;
   struct csv_parser *parser_ptr = &((*state_ptr).parser);
-  struct row_buffer row_buffer = (*state_ptr).row_buffer;
   csv_free(parser_ptr);
-  free_row_buffer(row_buffer);
 }
 
 static int load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
