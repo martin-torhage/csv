@@ -2,13 +2,13 @@
 #include "erl_nif.h"
 #include "csv.h"
 
-#define INPUT_BUFFER_LEN 4096
-#define MAX_COLS 4096
-#define MAX_ROWS 4096
-#define MAX_COL_LEN 1024
+#define MAX_INPUT_BATCH_SIZE 4096
+#define MAX_ROWS_PER_BATCH 4096
+#define MAX_COLS 1024
+#define MAX_COL_SIZE 16384
 
 struct column {
-  char data[MAX_COL_LEN];
+  char data[MAX_COL_SIZE];
   int size;
 };
 
@@ -18,7 +18,7 @@ struct row_buffer {
 };
 
 struct out_buffer {
-  ERL_NIF_TERM rows[MAX_ROWS];
+  ERL_NIF_TERM rows[MAX_ROWS_PER_BATCH];
   int row_n;
 };
 
@@ -145,7 +145,7 @@ static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   if (!enif_inspect_binary(env, argv[1], &csv)) {
     return enif_make_badarg(env);
   }
-  if (csv.size > INPUT_BUFFER_LEN) {
+  if (csv.size > MAX_INPUT_BATCH_SIZE) {
     return enif_make_badarg(env);
   }
 
