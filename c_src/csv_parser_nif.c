@@ -37,7 +37,9 @@ struct callback_state {
 
 ErlNifResourceType* state_type;
 
-static void add_value(void *data_ptr, int size, struct callback_state* cb_state_ptr) {
+static void add_value(void *data_ptr, int size,
+                      struct callback_state* cb_state_ptr)
+{
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
   struct column *column_ptr;
   int copy_size;
@@ -50,7 +52,8 @@ static void add_value(void *data_ptr, int size, struct callback_state* cb_state_
   }
 }
 
-static void add_row(struct callback_state* cb_state_ptr) {
+static void add_row(struct callback_state* cb_state_ptr)
+{
   struct out_buffer *out_buffer_ptr = &(cb_state_ptr->out_buffer);
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
   ErlNifEnv* env_ptr = cb_state_ptr->env;
@@ -71,17 +74,20 @@ static void add_row(struct callback_state* cb_state_ptr) {
   }
 }
 
-void column_callback (void *data_ptr, size_t size, void *cb_state_void_ptr) {
+void column_callback (void *data_ptr, size_t size, void *cb_state_void_ptr)
+{
   add_value(data_ptr,
             size,
             (struct callback_state*) cb_state_void_ptr);
 }
 
-void row_callback (int c, void *cb_state_void_ptr) {
+void row_callback (int c, void *cb_state_void_ptr)
+{
   add_row((struct callback_state*) cb_state_void_ptr);
 }
 
-static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr) {
+static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr)
+{
   ERL_NIF_TERM ret;
   ErlNifEnv* env_ptr = (*cb_state_ptr).env;
   struct out_buffer out_buffer = (*cb_state_ptr).out_buffer;
@@ -90,24 +96,29 @@ static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr) {
   return ret;
 }
 
-void init_row_buffer(struct row_buffer *row_buffer_ptr) {
+void init_row_buffer(struct row_buffer *row_buffer_ptr)
+{
   row_buffer_ptr->col_n = 0;
 }
 
-static struct state* init_state() {
+static struct state* init_state()
+{
   struct state* state_ptr = enif_alloc_resource(state_type,
                                                 sizeof(struct state));
   init_row_buffer(&state_ptr->row_buffer);
   return state_ptr;
 }
 
-static void init_callback_state(struct callback_state *cb_state_ptr, ErlNifEnv* env_ptr, struct state *state_ptr) {
+static void init_callback_state(struct callback_state *cb_state_ptr,
+                                ErlNifEnv* env_ptr, struct state *state_ptr)
+{
   (*cb_state_ptr).env = env_ptr;
   (*cb_state_ptr).out_buffer.row_n = 0;
   (*cb_state_ptr).row_buffer_ptr = &((*state_ptr).row_buffer);
 }
 
-static ERL_NIF_TERM init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
   ERL_NIF_TERM ret;
   struct state* state_ptr = init_state();
   struct csv_parser *parser_ptr = &((*state_ptr).parser);
