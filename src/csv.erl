@@ -1,10 +1,12 @@
 -module(csv).
 -export([decode_fold/3,
-         decode_fold_binary/3]).
+         decode_fold_binary/3,
+         decode_fold_gzip/3]).
 
 %% Max size of each batch to decode. This is also hardcoded in the
 %% NIF.
 -define(MAX_BATCH_SIZE, 4096).
+-define(GZIP_HEADER_SIZE, 31).
 
 -record(state,
         {parser          :: term(),
@@ -23,6 +25,23 @@ decode_fold_binary(Folder, AccIn, Csv) when is_binary(Csv) ->
                         {Csv, done}
                 end,
     decode_fold(Folder, AccIn, {Generator, init_state}).
+
+decode_fold_gzip(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
+    Z = zlib:open(),
+    ok = zlib:inflateInit(Z, ?GZIP_HEADER_SIZE),
+    Generator =
+        fun(Gzip) ->
+                {GzipHead, GzipRest} = binary_split_by_size(Gzip, 16 * 1024),
+                case zlib:inflate(Z, GzipHead) of
+                    [] when GzipRest =:= <<>> ->
+                        ok = zlib:inflateEnd(Z),
+                        ok = zlib:close(Z),
+                        {<<>>, done};
+                    IoList ->
+                        {iolist_to_binary(IoList), GzipRest}
+                end
+        end,
+    decode_fold(Folder, AccIn, {Generator, CsvGzip}).
 
 %% Internal
 
