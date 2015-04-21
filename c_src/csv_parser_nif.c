@@ -89,8 +89,8 @@ void row_callback (int c, void *cb_state_void_ptr)
 static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr)
 {
   ERL_NIF_TERM ret;
-  ErlNifEnv* env_ptr = (*cb_state_ptr).env;
-  struct out_buffer out_buffer = (*cb_state_ptr).out_buffer;
+  ErlNifEnv* env_ptr = cb_state_ptr->env;
+  struct out_buffer out_buffer = cb_state_ptr->out_buffer;
   ret = enif_make_list_from_array(env_ptr, out_buffer.rows, out_buffer.row_n);
   out_buffer.row_n = 0;
   return ret;
@@ -112,16 +112,16 @@ static struct state* init_state()
 static void init_callback_state(struct callback_state *cb_state_ptr,
                                 ErlNifEnv* env_ptr, struct state *state_ptr)
 {
-  (*cb_state_ptr).env = env_ptr;
-  (*cb_state_ptr).out_buffer.row_n = 0;
-  (*cb_state_ptr).row_buffer_ptr = &((*state_ptr).row_buffer);
+  cb_state_ptr->env = env_ptr;
+  cb_state_ptr->out_buffer.row_n = 0;
+  cb_state_ptr->row_buffer_ptr = &(state_ptr->row_buffer);
 }
 
 static ERL_NIF_TERM init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM ret;
   struct state* state_ptr = init_state();
-  struct csv_parser *parser_ptr = &((*state_ptr).parser);
+  struct csv_parser *parser_ptr = &(state_ptr->parser);
   csv_init(parser_ptr, 0);
   ret = enif_make_resource(env, parser_ptr);
   enif_release_resource(state_ptr);
@@ -140,7 +140,7 @@ static ERL_NIF_TERM close(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   if (!enif_get_resource(env, argv[0], state_type, (void**) &state_ptr)) {
     return enif_make_badarg(env);
   }
-  parser_ptr = &((*state_ptr).parser);
+  parser_ptr = &(state_ptr->parser);
 
   init_callback_state(&cb_state, env, state_ptr);
   csv_fini(parser_ptr, column_callback, row_callback, &cb_state);
@@ -160,7 +160,7 @@ static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   if (!enif_get_resource(env, argv[0], state_type, (void**) &state_ptr)) {
     return enif_make_badarg(env);
   }
-  parser_ptr = &((*state_ptr).parser);
+  parser_ptr = &(state_ptr->parser);
 
   if (!enif_inspect_binary(env, argv[1], &csv)) {
     return enif_make_badarg(env);
@@ -189,7 +189,7 @@ static ErlNifFunc nif_funcs[] =
 void state_dtor(ErlNifEnv* env, void* obj_ptr)
 {
   struct state* state_ptr = (struct state*) obj_ptr;
-  struct csv_parser *parser_ptr = &((*state_ptr).parser);
+  struct csv_parser *parser_ptr = &(state_ptr->parser);
   csv_free(parser_ptr);
 }
 
