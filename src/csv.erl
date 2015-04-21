@@ -1,21 +1,52 @@
 -module(csv).
--export([decode_fold/3]).
+-export([decode_fold/3,
+         decode_fold_binary/3]).
 
-decode_fold(Folder, AccIn, Csv) when is_binary(Csv) ->
-    decode_fold1(Folder, AccIn, {undefined, Csv}).
+%% Max size of each batch to decode. This is also hardcoded in the
+%% NIF.
+-define(MAX_BATCH_SIZE, 4096).
 
-% Internal
+-record(state,
+        {parser          :: term(),
+         generator       :: fun(),
+         generator_state :: term(),
+         csv_buffer      :: binary()}).
 
-decode_fold1(Folder, Acc, {undefined, Csv}) ->
-    Parser = csv_parser:init(),
-    decode_fold1(Folder, Acc, {Parser, Csv});
-decode_fold1(Folder, Acc, {Parser, <<>>}) ->
-    Rows = csv_parser:close(Parser),
+decode_fold(Folder, AccIn, {Generator, GeneratorState}) ->
+    State = #state{generator = Generator,
+                   generator_state = GeneratorState,
+                   csv_buffer = <<>>},
+    decode_fold1(Folder, AccIn, State).
+
+decode_fold_binary(Folder, AccIn, Csv) when is_binary(Csv) ->
+    Generator = fun(init_state) ->
+                        {Csv, done}
+                end,
+    decode_fold(Folder, AccIn, {Generator, init_state}).
+
+%% Internal
+
+decode_fold1(Folder, Acc, #state{parser = undefined} = State) ->
+    NewState = State#state{parser = csv_parser:init()},
+    decode_fold1(Folder, Acc, NewState);
+decode_fold1(Folder, Acc,
+             #state{generator_state = done, csv_buffer = <<>>} = State) ->
+    Rows = csv_parser:close(State#state.parser),
     lists:foldl(Folder, Acc, Rows);
-decode_fold1(Folder, Acc, {Parser, Csv}) ->
-    {CsvHead, CsvTail} = binary_split_by_size(Csv, 4096),
-    NewAcc = lists:foldl(Folder, Acc, csv_parser:parse(Parser, CsvHead)),
-    decode_fold1(Folder, NewAcc, {Parser, CsvTail}).
+decode_fold1(Folder, Acc, #state{csv_buffer = CsvBuffer} = State)
+  when CsvBuffer =/= <<>> ->
+    {CsvHead, CsvTail} = binary_split_by_size(CsvBuffer, ?MAX_BATCH_SIZE),
+    NewState = State#state{csv_buffer = CsvTail},
+    Rows = csv_parser:parse(State#state.parser, CsvHead),
+    NewAcc = lists:foldl(Folder, Acc, Rows),
+    decode_fold1(Folder, NewAcc, NewState);
+decode_fold1(Folder, Acc, State) ->
+    #state{generator = Generator,
+           generator_state = GeneratorState} = State,
+    {NewCsvBuffer, NewGeneratorState} = Generator(GeneratorState),
+    NewState = State#state{csv_buffer = NewCsvBuffer,
+                           generator_state = NewGeneratorState},
+    decode_fold1(Folder, Acc, NewState).
 
 binary_split_by_size(Bin, Size) ->
     case Size >= byte_size(Bin) of
