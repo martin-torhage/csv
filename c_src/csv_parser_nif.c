@@ -183,11 +183,11 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
 }
 
 static ErlNifFunc nif_funcs[] =
-{
-  {"init", 0, init},
-  {"close", 1, close},
-  {"parse", 2, parse},
-};
+  {
+    {"init", 0, init},
+    {"close", 1, close},
+    {"parse", 2, parse},
+  };
 
 void state_dtor(ErlNifEnv* env_ptr, void* obj_ptr)
 {
