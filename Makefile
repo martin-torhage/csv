@@ -1,6 +1,6 @@
 # -*-Make-*-
 #
-# Copyright © Campanja AB 2012. All Rights Reserve.
+# Copyright © Campanja AB 2012. All Rights Reserved.
 ERL ?= erl
 REBAR=bin/rebar
 
