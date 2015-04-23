@@ -17,4 +17,6 @@ parse(_, _) ->
 %% Internal
 
 init_nif() ->
-    ok = erlang:load_nif("./priv/csv_parser_nif", 0).
+    File = filename:join([code:priv_dir(csv),
+                          "csv_parser_nif"]),
+    ok = erlang:load_nif(File, 0).
