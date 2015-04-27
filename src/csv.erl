@@ -1,7 +1,7 @@
 -module(csv).
 -export([decode_fold/3,
-         decode_fold_binary/3,
-         decode_fold_gzip/3]).
+         decode_binary_fold/3,
+         decode_gzip_fold/3]).
 
 %% Max size of each CSV batch to decode. This is also hardcoded in the
 %% NIF.
@@ -20,13 +20,13 @@ decode_fold(Folder, AccIn, {Generator, GeneratorState}) ->
                    csv_buffer = <<>>},
     decode_fold1(Folder, AccIn, State).
 
-decode_fold_binary(Folder, AccIn, Csv) when is_binary(Csv) ->
+decode_binary_fold(Folder, AccIn, Csv) when is_binary(Csv) ->
     Generator = fun(init_state) ->
                         {Csv, done}
                 end,
     decode_fold(Folder, AccIn, {Generator, init_state}).
 
-decode_fold_gzip(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
+decode_gzip_fold(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
     Z = zlib:open(),
     ok = zlib:inflateInit(Z, ?GZIP_HEADER_SIZE),
     Generator =
