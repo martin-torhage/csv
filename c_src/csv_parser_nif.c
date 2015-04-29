@@ -117,16 +117,22 @@ static void init_callback_state(struct callback_state *cb_state_ptr,
   cb_state_ptr->row_buffer_ptr = &(state_ptr->row_buffer);
 }
 
+ERL_NIF_TERM ok_tuple(ErlNifEnv* env_ptr, ERL_NIF_TERM term)
+{
+  ERL_NIF_TERM ok_atom = enif_make_atom(env_ptr, "ok");
+  return enif_make_tuple2(env_ptr, ok_atom, term);
+}
+
 static ERL_NIF_TERM init(ErlNifEnv* env_ptr, int argc,
                          const ERL_NIF_TERM argv[])
 {
-  ERL_NIF_TERM ret;
+  ERL_NIF_TERM resource;
   struct state* state_ptr = init_state();
   struct csv_parser *parser_ptr = &(state_ptr->parser);
   csv_init(parser_ptr, 0);
-  ret = enif_make_resource(env_ptr, parser_ptr);
+  resource = enif_make_resource(env_ptr, parser_ptr);
   enif_release_resource(state_ptr);
-  return ret;
+  return ok_tuple(env_ptr, resource);
 }
 
 static ERL_NIF_TERM close(ErlNifEnv* env_ptr, int argc,
@@ -146,7 +152,7 @@ static ERL_NIF_TERM close(ErlNifEnv* env_ptr, int argc,
 
   init_callback_state(&cb_state, env_ptr, state_ptr);
   csv_fini(parser_ptr, column_callback, row_callback, &cb_state);
-  return make_output(&cb_state);
+  return ok_tuple(env_ptr, make_output(&cb_state));
 }
 
 static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
@@ -179,7 +185,7 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
                             csv_strerror(csv_error(parser_ptr)),
                             ERL_NIF_LATIN1);
   }
-  return make_output(&cb_state);
+  return ok_tuple(env_ptr, make_output(&cb_state));
 }
 
 static ErlNifFunc nif_funcs[] =
