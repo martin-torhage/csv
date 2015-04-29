@@ -46,17 +46,18 @@ decode_gzip_fold(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
 %% Internal
 
 decode_fold1(Folder, Acc, #state{parser = undefined} = State) ->
-    NewState = State#state{parser = csv_parser:init()},
+    {ok, Parser} = csv_parser:init(),
+    NewState = State#state{parser = Parser},
     decode_fold1(Folder, Acc, NewState);
 decode_fold1(Folder, Acc,
              #state{generator_state = done, csv_buffer = <<>>} = State) ->
-    Rows = csv_parser:close(State#state.parser),
+    {ok, Rows} = csv_parser:close(State#state.parser),
     lists:foldl(Folder, Acc, Rows);
 decode_fold1(Folder, Acc, #state{csv_buffer = CsvBuffer} = State)
   when CsvBuffer =/= <<>> ->
     {CsvHead, CsvTail} = binary_split_by_size(CsvBuffer, ?MAX_BATCH_SIZE),
     NewState = State#state{csv_buffer = CsvTail},
-    Rows = csv_parser:parse(State#state.parser, CsvHead),
+    {ok, Rows} = csv_parser:parse(State#state.parser, CsvHead),
     NewAcc = lists:foldl(Folder, Acc, Rows),
     decode_fold1(Folder, NewAcc, NewState);
 decode_fold1(Folder, Acc, State) ->
