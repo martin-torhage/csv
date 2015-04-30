@@ -130,7 +130,7 @@ static ERL_NIF_TERM init(ErlNifEnv* env_ptr, int argc,
   struct state* state_ptr = init_state();
   struct csv_parser *parser_ptr = &(state_ptr->parser);
   csv_init(parser_ptr, 0);
-  resource = enif_make_resource(env_ptr, parser_ptr);
+  resource = enif_make_resource(env_ptr, state_ptr);
   enif_release_resource(state_ptr);
   return ok_tuple(env_ptr, resource);
 }
