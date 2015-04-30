@@ -6,13 +6,13 @@
          parse/2]).
 
 init() ->
-    nif_not_loaded.
+    {error, nif_not_loaded}.
 
 close(_) ->
-    nif_not_loaded.
+    {error, nif_not_loaded}.
 
 parse(_, _) ->
-    nif_not_loaded.
+    {error, nif_not_loaded}.
 
 %% Internal
 

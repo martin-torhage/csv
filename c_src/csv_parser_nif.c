@@ -105,7 +105,9 @@ static struct state* init_state()
 {
   struct state* state_ptr = enif_alloc_resource(state_type,
                                                 sizeof(struct state));
-  init_row_buffer(&state_ptr->row_buffer);
+  if (state_ptr != NULL) {
+    init_row_buffer(&state_ptr->row_buffer);
+  }
   return state_ptr;
 }
 
@@ -123,13 +125,46 @@ ERL_NIF_TERM ok_tuple(ErlNifEnv* env_ptr, ERL_NIF_TERM term)
   return enif_make_tuple2(env_ptr, ok_atom, term);
 }
 
+ERL_NIF_TERM error_tuple(ErlNifEnv* env_ptr, ERL_NIF_TERM term)
+{
+  ERL_NIF_TERM error_atom = enif_make_atom(env_ptr, "error");
+  return enif_make_tuple2(env_ptr, error_atom, term);
+}
+
+ERL_NIF_TERM error(ErlNifEnv* env_ptr, const char* reason)
+{
+  return error_tuple(env_ptr, enif_make_string(env_ptr,
+                                               reason,
+                                               ERL_NIF_LATIN1));
+}
+
+ERL_NIF_TERM error2(ErlNifEnv* env_ptr, const char* reason1,
+                    const char* reason2)
+{
+  return error_tuple(env_ptr,
+                     enif_make_tuple2(env_ptr,
+                                      enif_make_string(env_ptr,
+                                                       reason1,
+                                                       ERL_NIF_LATIN1),
+                                      enif_make_string(env_ptr,
+                                                       reason2,
+                                                       ERL_NIF_LATIN1)));
+}
+
 static ERL_NIF_TERM init(ErlNifEnv* env_ptr, int argc,
                          const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM resource;
-  struct state* state_ptr = init_state();
-  struct csv_parser *parser_ptr = &(state_ptr->parser);
-  csv_init(parser_ptr, 0);
+  struct state* state_ptr;
+  struct csv_parser *parser_ptr;
+  state_ptr = init_state();
+  if (state_ptr == NULL) {
+    return error(env_ptr, "init_state failed");
+  }
+  parser_ptr = &(state_ptr->parser);
+  if (csv_init(parser_ptr, 0) != 0) {
+    return error(env_ptr, "csv_init failed");
+  }
   resource = enif_make_resource(env_ptr, state_ptr);
   enif_release_resource(state_ptr);
   return ok_tuple(env_ptr, resource);
@@ -151,8 +186,11 @@ static ERL_NIF_TERM close(ErlNifEnv* env_ptr, int argc,
   parser_ptr = &(state_ptr->parser);
 
   init_callback_state(&cb_state, env_ptr, state_ptr);
-  csv_fini(parser_ptr, column_callback, row_callback, &cb_state);
-  return ok_tuple(env_ptr, make_output(&cb_state));
+  if (csv_fini(parser_ptr, column_callback, row_callback, &cb_state) != 0) {
+    return error(env_ptr, "csv_fini failed");
+  } else {
+    return ok_tuple(env_ptr, make_output(&cb_state));
+  }
 }
 
 static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
@@ -181,11 +219,12 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
   init_callback_state(&cb_state, env_ptr, state_ptr);
   if (csv_parse(parser_ptr, csv.data, (size_t) csv.size,
                 column_callback, row_callback, &cb_state) != csv.size) {
-    return enif_make_string(env_ptr,
-                            csv_strerror(csv_error(parser_ptr)),
-                            ERL_NIF_LATIN1);
+    return error2(env_ptr,
+                  "csv_parse failed",
+                  csv_strerror(csv_error(parser_ptr)));
+  } else {
+    return ok_tuple(env_ptr, make_output(&cb_state));
   }
-  return ok_tuple(env_ptr, make_output(&cb_state));
 }
 
 static ErlNifFunc nif_funcs[] =
