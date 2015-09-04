@@ -1,6 +1,7 @@
 -module(csv).
 -export([decode_fold/3,
          decode_binary_fold/3,
+         decode_binary/1,
          decode_gzip_fold/3]).
 
 %% Max size of each CSV batch to decode. This is also hardcoded in the
@@ -25,6 +26,10 @@ decode_binary_fold(Folder, AccIn, Csv) when is_binary(Csv) ->
                         {Csv, done}
                 end,
     decode_fold(Folder, AccIn, {Generator, init_state}).
+
+decode_binary(Csv) when is_binary(Csv) ->
+    Folder = fun(Row, Acc) -> [Row | Acc] end,
+    lists:reverse(decode_binary_fold(Folder, [], Csv)).
 
 decode_gzip_fold(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
     Z = zlib:open(),
