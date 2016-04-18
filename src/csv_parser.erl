@@ -6,13 +6,13 @@
          parse/2]).
 
 init() ->
-    {error, nif_not_loaded}.
+    erlang:nif_error(nif_not_loaded).
 
 close(_) ->
-    {error, nif_not_loaded}.
+    erlang:nif_error(nif_not_loaded).
 
 parse(_, _) ->
-    {error, nif_not_loaded}.
+    erlang:nif_error(nif_not_loaded).
 
 %% Internal
 
