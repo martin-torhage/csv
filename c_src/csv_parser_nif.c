@@ -1,6 +1,6 @@
 #include <string.h>
 #include "erl_nif.h"
-#include "libcsv/csv.h"
+#include "../deps/libcsv/csv.h"
 
 #define MAX_INPUT_BATCH_SIZE 4096
 #define MAX_ROWS_PER_BATCH 4096

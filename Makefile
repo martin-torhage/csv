@@ -26,3 +26,12 @@ clean:
 
 dist-clean: clean
 	@${REBAR} -j delete-deps
+
+# Since rebar is using a single deps directory, inhereted by the top
+# rebar.config, the relative path to the deps will vary. Building the
+# C code requires a static relative path to libcsv, so we fetch libcsv
+# here with a new rebar instance where we remove the inherited deps
+# path. The deps dir is also specified in rebar-libcsv.config.
+get-libcsv:
+	@echo "Fetching libcsv into local deps dir."
+	@REBAR_DEPS_DIR=deps ${REBAR} -C rebar-libcsv.config get-deps
