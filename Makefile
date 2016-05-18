@@ -25,7 +25,7 @@ clean:
 	@${REBAR} -j clean
 	rm -fr logs
 
-dist-clean: clean
+distclean: clean
 	@${REBAR} -j delete-deps
 	rm -rf "${LOCAL_DEPS}"
 
