@@ -3,6 +3,7 @@
 # Copyright © Campanja AB 2012. All Rights Reserved.
 ERL ?= erl
 REBAR=bin/rebar
+LOCAL_DEPS=deps
 
 .PHONY: deps xref
 
@@ -26,6 +27,7 @@ clean:
 
 dist-clean: clean
 	@${REBAR} -j delete-deps
+	rm -rf "${LOCAL_DEPS}"
 
 # Since rebar is using a single deps directory, inhereted by the top
 # rebar.config, the relative path to the deps will vary. Building the
@@ -34,4 +36,4 @@ dist-clean: clean
 # path. The deps dir is also specified in rebar-libcsv.config.
 get-libcsv:
 	@echo "Fetching libcsv into local deps dir."
-	@REBAR_DEPS_DIR=deps ${REBAR} -C rebar-libcsv.config get-deps
+	@REBAR_DEPS_DIR="${LOCAL_DEPS}" ${REBAR} -C rebar-libcsv.config get-deps
