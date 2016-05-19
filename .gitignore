@@ -2,5 +2,5 @@ ebin
 .rebar
 .eunit
 c_src/*.o
-c_src/libcsv/*.o
 priv/*.so
+deps/libcsv/
