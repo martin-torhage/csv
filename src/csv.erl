@@ -13,12 +13,14 @@
         {parser          :: term(),
          generator       :: fun(),
          generator_state :: term(),
-         csv_buffer      :: binary()}).
+         csv_buffer      :: binary(),
+         parsed_buffer   :: [[string()]]}).
 
 decode_fold(Folder, AccIn, {Generator, GeneratorState}) ->
     State = #state{generator = Generator,
                    generator_state = GeneratorState,
-                   csv_buffer = <<>>},
+                   csv_buffer = <<>>,
+                   parsed_buffer = []},
     decode_fold1(Folder, AccIn, State).
 
 decode_binary_fold(Folder, AccIn, Csv) when is_binary(Csv) ->
@@ -54,17 +56,28 @@ decode_fold1(Folder, Acc, #state{parser = undefined} = State) ->
     {ok, Parser} = csv_parser:init(),
     NewState = State#state{parser = Parser},
     decode_fold1(Folder, Acc, NewState);
-decode_fold1(Folder, Acc,
-             #state{generator_state = done, csv_buffer = <<>>} = State) ->
+decode_fold1(Folder, Acc, #state{parsed_buffer = ParsedRows} = State)
+  when ParsedRows =/= [] ->
+    NewAcc = lists:foldl(Folder, Acc, ParsedRows),
+    NewState = State#state{parsed_buffer = []},
+    decode_fold1(Folder, NewAcc, NewState);
+decode_fold1(_, Acc, #state{generator_state = done,
+                                 csv_buffer = <<>>,
+                                 parser = closed}) ->
+    Acc;
+decode_fold1(Folder, Acc, #state{generator_state = done,
+                                 csv_buffer = <<>>} = State) ->
     {ok, Rows} = csv_parser:close(State#state.parser),
-    lists:foldl(Folder, Acc, Rows);
+    NewState = State#state{parser = closed,
+                           parsed_buffer = Rows},
+    decode_fold1(Folder, Acc, NewState);
 decode_fold1(Folder, Acc, #state{csv_buffer = CsvBuffer} = State)
   when CsvBuffer =/= <<>> ->
     {CsvHead, CsvTail} = binary_split_by_size(CsvBuffer, ?MAX_BATCH_SIZE),
-    NewState = State#state{csv_buffer = CsvTail},
     {ok, Rows} = csv_parser:parse(State#state.parser, CsvHead),
-    NewAcc = lists:foldl(Folder, Acc, Rows),
-    decode_fold1(Folder, NewAcc, NewState);
+    NewState = State#state{csv_buffer = CsvTail,
+                           parsed_buffer = Rows},
+    decode_fold1(Folder, Acc, NewState);
 decode_fold1(Folder, Acc, State) ->
     #state{generator = Generator,
            generator_state = GeneratorState} = State,
