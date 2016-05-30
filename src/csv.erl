@@ -66,17 +66,19 @@ decode_fold1(_, Acc, #state{generator_state = done,
                                  parser = closed}) ->
     Acc;
 decode_fold1(Folder, Acc, #state{generator_state = done,
-                                 csv_buffer = <<>>} = State) ->
+                                 csv_buffer = <<>>,
+                                 parsed_buffer = ParsedBuffer} = State) ->
     {ok, Rows} = csv_parser:close(State#state.parser),
     NewState = State#state{parser = closed,
-                           parsed_buffer = Rows},
+                           parsed_buffer = ParsedBuffer ++ Rows},
     decode_fold1(Folder, Acc, NewState);
-decode_fold1(Folder, Acc, #state{csv_buffer = CsvBuffer} = State)
+decode_fold1(Folder, Acc, #state{csv_buffer = CsvBuffer,
+                                 parsed_buffer = ParsedBuffer} = State)
   when CsvBuffer =/= <<>> ->
     {CsvHead, CsvTail} = binary_split_by_size(CsvBuffer, ?MAX_BATCH_SIZE),
     {ok, Rows} = csv_parser:parse(State#state.parser, CsvHead),
     NewState = State#state{csv_buffer = CsvTail,
-                           parsed_buffer = Rows},
+                           parsed_buffer = ParsedBuffer ++ Rows},
     decode_fold1(Folder, Acc, NewState);
 decode_fold1(Folder, Acc, State) ->
     #state{generator = Generator,
