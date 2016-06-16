@@ -21,13 +21,17 @@ decode_fold(Folder, AccIn, {Generator, GeneratorState}) ->
                    generator_state = GeneratorState,
                    csv_buffer = <<>>,
                    parsed_buffer = []},
-    decode_fold1(Folder, AccIn, State).
+    {complete, Decoded} = decode_fold1(Folder, AccIn, State),
+    Decoded.
 
 decode_binary_fold(Folder, AccIn, Csv) when is_binary(Csv) ->
     Generator = fun(init_state) ->
                         {Csv, done}
                 end,
-    decode_fold(Folder, AccIn, {Generator, init_state}).
+    CtrlFolder = fun (Row, CtrlAcc) ->
+                         {ok, Folder(Row, CtrlAcc)}
+                 end,
+    decode_fold(CtrlFolder, AccIn, {Generator, init_state}).
 
 decode_binary(Csv) when is_binary(Csv) ->
     Folder = fun(Row, Acc) -> [Row | Acc] end,
@@ -58,27 +62,42 @@ decode_fold1(Folder, Acc, #state{parser = undefined} = State) ->
     decode_fold1(Folder, Acc, NewState);
 decode_fold1(Folder, Acc, #state{parsed_buffer = ParsedRows} = State)
   when ParsedRows =/= [] ->
-    NewAcc = lists:foldl(Folder, Acc, ParsedRows),
-    NewState = State#state{parsed_buffer = []},
-    decode_fold1(Folder, NewAcc, NewState);
+    CtrlFolder = fun(Row, {Acc2}) ->
+                         case Folder(Row, Acc2) of
+                             {ok, NewAcc2} ->
+                                 {NewAcc2};
+                             {pause, NewAcc2} ->
+                                 {NewAcc2, []}
+                         end;
+                    (Row, {Acc2, RestBuffer}) ->
+                         {Acc2, [Row | RestBuffer]}
+                 end,
+    case lists:foldl(CtrlFolder, {Acc}, ParsedRows) of
+        {NewAcc} ->
+            NewState = State#state{parsed_buffer = []},
+            decode_fold1(Folder, NewAcc, NewState);
+        {NewAcc, RestRows} ->
+            NewState = State#state{parsed_buffer = RestRows},
+            {paused, NewAcc, NewState}
+    end;
 decode_fold1(_, Acc, #state{generator_state = done,
                                  csv_buffer = <<>>,
                                  parser = closed}) ->
-    Acc;
+    {complete, Acc};
 decode_fold1(Folder, Acc, #state{generator_state = done,
                                  csv_buffer = <<>>,
-                                 parsed_buffer = ParsedBuffer} = State) ->
+                                 parsed_buffer = []} = State) ->
     {ok, Rows} = csv_parser:close(State#state.parser),
     NewState = State#state{parser = closed,
-                           parsed_buffer = ParsedBuffer ++ Rows},
+                           parsed_buffer = Rows},
     decode_fold1(Folder, Acc, NewState);
 decode_fold1(Folder, Acc, #state{csv_buffer = CsvBuffer,
-                                 parsed_buffer = ParsedBuffer} = State)
+                                 parsed_buffer = []} = State)
   when CsvBuffer =/= <<>> ->
     {CsvHead, CsvTail} = binary_split_by_size(CsvBuffer, ?MAX_BATCH_SIZE),
     {ok, Rows} = csv_parser:parse(State#state.parser, CsvHead),
     NewState = State#state{csv_buffer = CsvTail,
-                           parsed_buffer = ParsedBuffer ++ Rows},
+                           parsed_buffer = Rows},
     decode_fold1(Folder, Acc, NewState);
 decode_fold1(Folder, Acc, State) ->
     #state{generator = Generator,
