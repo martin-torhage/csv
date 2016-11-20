@@ -3,7 +3,8 @@
 
 -export([init/0,
          close/1,
-         parse/2]).
+         feed/2,
+         parse/1]).
 
 init() ->
     erlang:nif_error(nif_not_loaded).
@@ -11,7 +12,10 @@ init() ->
 close(_) ->
     erlang:nif_error(nif_not_loaded).
 
-parse(_, _) ->
+feed(_, _) ->
+    erlang:nif_error(nif_not_loaded).
+
+parse(_) ->
     erlang:nif_error(nif_not_loaded).
 
 %% Internal
