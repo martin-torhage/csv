@@ -3,7 +3,7 @@
 #include "../deps/libcsv/csv.h"
 
 #define MAX_INPUT_BATCH_SIZE 4096
-#define MAX_ROWS_PER_BATCH 4096
+#define MAX_ROWS_PER_BATCH MAX_INPUT_BATCH_SIZE + 1
 #define MAX_COLS 1024
 #define MAX_COL_SIZE 16384
 
