@@ -191,7 +191,9 @@ bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr) {
   }
 }
 
-void get_csv_chunk(struct csv_chunk *chunk_ptr, struct state *state_ptr) {
+void get_csv_chunk(struct csv_chunk *chunk_ptr, struct state *state_ptr,
+                   int max_len)
+{
   struct csv_buffer *csv_buffer_ptr;
   int bytes_read;
 
@@ -200,7 +202,7 @@ void get_csv_chunk(struct csv_chunk *chunk_ptr, struct state *state_ptr) {
     chunk_ptr->size = 0;
   } else {
     bytes_read = min(csv_buffer_ptr->size - csv_buffer_ptr->consumed,
-                     MAX_PARSE_SIZE);
+                     max_len);
     chunk_ptr->size = bytes_read;
     chunk_ptr->data_ptr = csv_buffer_ptr->data_ptr + csv_buffer_ptr->consumed;
     csv_buffer_ptr->consumed += bytes_read;
@@ -315,6 +317,41 @@ static ERL_NIF_TERM feed(ErlNifEnv* env_ptr, int argc,
   }
 }
 
+static ERL_NIF_TERM parse_one_full_row(ErlNifEnv* env_ptr, int argc,
+                                       const ERL_NIF_TERM argv[])
+{
+  struct state *state_ptr;
+  struct csv_parser *parser_ptr;
+  struct callback_state cb_state;
+  struct csv_chunk chunk;
+
+  if (argc != 1) {
+    return enif_make_badarg(env_ptr);
+  }
+  if (!enif_get_resource(env_ptr, argv[0], state_type, (void**) &state_ptr)) {
+    return enif_make_badarg(env_ptr);
+  }
+  parser_ptr = &(state_ptr->parser);
+  init_callback_state(&cb_state, env_ptr, state_ptr);
+
+  while (cb_state.out_buffer.row_n == 0) {
+    get_csv_chunk(&chunk, state_ptr, 1);
+    if (chunk.size == 0) {
+      return enif_make_tuple2(env_ptr,
+                              enif_make_atom(env_ptr, "error"),
+                              enif_make_atom(env_ptr, "eob"));
+    } else {
+      if (csv_parse(parser_ptr, chunk.data_ptr, (size_t) chunk.size,
+                    column_callback, row_callback, &cb_state) != chunk.size) {
+        return error2(env_ptr,
+                      "csv_parse failed",
+                      csv_strerror(csv_error(parser_ptr)));
+      }
+    }
+  }
+  return ok_tuple(env_ptr, make_output(&cb_state));
+}
+
 static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
                           const ERL_NIF_TERM argv[])
 {
@@ -331,7 +368,7 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
   }
   parser_ptr = &(state_ptr->parser);
 
-  get_csv_chunk(&chunk, state_ptr);
+  get_csv_chunk(&chunk, state_ptr, MAX_PARSE_SIZE);
   if (chunk.size == 0) {
     return enif_make_tuple2(env_ptr,
                             enif_make_atom(env_ptr, "error"),
@@ -354,7 +391,8 @@ static ErlNifFunc nif_funcs[] =
     {"init", 0, init},
     {"close", 1, close},
     {"feed", 2, feed},
-    {"parse", 1, parse},
+    {"parse_one_full_row", 1, parse_one_full_row},
+    {"parse", 2, parse},
   };
 
 void csv_buffer_dtor(struct csv_buffer *csv_buffer_ptr) {
