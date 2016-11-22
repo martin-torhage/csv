@@ -20,7 +20,7 @@ struct column {
 struct row_buffer {
   struct column *cols_ptr;
   int allocated_n;
-  int used;
+  int cols_used;
 };
 
 struct out_buffer {
@@ -65,16 +65,27 @@ void ensure_column_size(struct column *column_ptr, int size) {
   }
 }
 
+struct column empty_column() {
+  struct column col;
+  col.data_ptr = NULL;
+  col.allocated_size = 0;
+  col.data_size = 0;
+  return col;
+}
+
 void ensure_row_buffer_space(struct row_buffer *row_buffer_ptr) {
   struct column *new_cols_ptr;
   int new_allocated_n;
-  if (row_buffer_ptr->used == row_buffer_ptr->allocated_n) {
-    new_allocated_n = row_buffer_ptr->allocated_n + 1;
-    enif_alloc(new_cols_ptr, new_allocated_n * sizeof(column));
+  int i;
+  if (row_buffer_ptr->cols_used == row_buffer_ptr->allocated_n) {
+    new_allocated_n = row_buffer_ptr->allocated_n + 5;
+    new_cols_ptr = enif_alloc(sizeof(struct column) * new_allocated_n);
     memcpy(new_cols_ptr,
            row_buffer_ptr->cols_ptr,
-           row_buffer_ptr->allocated_n * (sizeof struct *column));
-    enif_alloc(&new_cols_ptr[new_allocated_n - 1], (sizeof struct column));
+           sizeof(struct column) * row_buffer_ptr->allocated_n);
+    for (i = row_buffer_ptr->allocated_n; i < new_allocated_n; i++) {
+      new_cols_ptr[i] = empty_column();
+    }
     enif_free(row_buffer_ptr->cols_ptr);
     row_buffer_ptr->cols_ptr = new_cols_ptr;
     row_buffer_ptr->allocated_n = new_allocated_n;
@@ -99,19 +110,19 @@ static void add_row(struct callback_state* cb_state_ptr)
   struct out_buffer *out_buffer_ptr = &(cb_state_ptr->out_buffer);
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
   ErlNifEnv* env_ptr = cb_state_ptr->env_ptr;
-  ERL_NIF_TERM cols[row_buffer_ptr->col_n];
+  ERL_NIF_TERM cols[row_buffer_ptr->cols_used];
   int i;
-  int col_n = row_buffer_ptr->col_n;
+  int cols_used = row_buffer_ptr->cols_used;
   if (out_buffer_ptr->row_n < MAX_ROWS_PER_BATCH) {
-    for (i = 0; i < col_n; i++) {
+    for (i = 0; i < cols_used; i++) {
       cols[i] = enif_make_string_len(env_ptr,
-                                     row_buffer_ptr->cols[i].data_ptr,
-                                     row_buffer_ptr->cols[i].data_size,
+                                     row_buffer_ptr->cols_ptr[i].data_ptr,
+                                     row_buffer_ptr->cols_ptr[i].data_size,
                                      ERL_NIF_LATIN1);
     }
-    row_buffer_ptr->col_n = 0;
+    row_buffer_ptr->cols_used = 0;
     out_buffer_ptr->rows[out_buffer_ptr->row_n] =
-      enif_make_list_from_array(env_ptr, cols, col_n);
+      enif_make_list_from_array(env_ptr, cols, cols_used);
     out_buffer_ptr->row_n++;
   }
 }
@@ -143,7 +154,7 @@ void init_row_buffer(struct row_buffer *row_buffer_ptr)
   int i;
   row_buffer_ptr->cols_ptr = NULL;
   row_buffer_ptr->allocated_n = 0;
-  row_buffer_ptr->used = 0;
+  row_buffer_ptr->cols_used = 0;
   /* for (i = 0; i < MAX_COLS; i++) { */
   /*   row_buffer_ptr->cols[i].data_ptr = NULL; */
   /* } */
