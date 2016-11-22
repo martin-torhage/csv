@@ -151,13 +151,9 @@ static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr)
 
 void init_row_buffer(struct row_buffer *row_buffer_ptr)
 {
-  int i;
   row_buffer_ptr->cols_ptr = NULL;
   row_buffer_ptr->allocated_n = 0;
   row_buffer_ptr->cols_used = 0;
-  /* for (i = 0; i < MAX_COLS; i++) { */
-  /*   row_buffer_ptr->cols[i].data_ptr = NULL; */
-  /* } */
 }
 
 void init_csv_buffer(struct csv_buffer *csv_buffer_ptr)
