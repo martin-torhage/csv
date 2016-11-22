@@ -12,6 +12,18 @@
          generator       :: fun(),
          generator_state :: term()}).
 
+decode_fold({maker, FolderMaker}, AccIn, {Generator, GeneratorState}) ->
+    {arity, Arity} = erlang:fun_info(FolderMaker, arity),
+    State = #state{generator = Generator,
+                   generator_state = GeneratorState},
+    case decode_n_rows(State, Arity) of
+        not_enough_rows ->
+            AccIn;
+        {Rows, NewState} ->
+            {Folder, Capture} = erlang:apply(FolderMaker, Rows),
+            ok = csv_parser:set_capture(NewState#state.parser, Capture),
+            decode_fold1(Folder, AccIn, NewState)
+    end;
 decode_fold(Folder, AccIn, {Generator, GeneratorState}) ->
     State = #state{generator = Generator,
                    generator_state = GeneratorState},
@@ -46,25 +58,49 @@ decode_gzip_fold(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
 
 %% Internal
 
-decode_fold1(Folder, Acc, #state{parser = undefined} = State) ->
+decode_n_rows(State, N) ->
+    decode_n_rows(State, N, []).
+
+decode_n_rows(State, 0, Acc) ->
+    {lists:reverse(Acc), State};
+decode_n_rows(State, N, Acc) ->
+    case parse(fun csv_parser:parse_one_row/1, State) of
+        done ->
+            not_enough_rows;
+        {[Row], NewState}->
+            decode_n_rows(NewState, N - 1, [Row | Acc])
+    end.
+
+parse(_, #state{parser = closed}) ->
+    done;
+parse(ParseFun, #state{parser = undefined} = State) ->
     {ok, Parser} = csv_parser:init(),
     NewState = State#state{parser = Parser,
                            parser_state = eob},
-    decode_fold1(Folder, Acc, NewState);
-decode_fold1(Folder, Acc, #state{generator_state = done,
-                                 parser_state = eob} = State) ->
+    parse(ParseFun, NewState);
+parse(_, #state{generator_state = done,
+                parser_state = eob} = State) ->
     {ok, Rows} = csv_parser:close(State#state.parser),
-    lists:foldl(Folder, Acc, Rows);
-decode_fold1(Folder, Acc, #state{parser_state = eob} = State) ->
-    decode_fold1(Folder, Acc, feed_nif(State));
+    NewState = State#state{parser = closed},
+    {Rows, NewState};
+parse(ParseFun, #state{parser_state = eob} = State) ->
+    parse(ParseFun, feed_nif(State));
+parse(ParseFun, State) ->
+    case ParseFun(State#state.parser) of
+        {error, eob} ->
+            parse(ParseFun, State#state{parser_state = eob});
+        {ok, Rows} ->
+            {Rows, State}
+    end.
+
 decode_fold1(Folder, Acc, State) ->
-    {NewAcc, NewState} = case csv_parser:parse(State#state.parser) of
-                             {error, eob} ->
-                                 {Acc, State#state{parser_state = eob}};
-                             {ok, Rows} ->
-                                 {lists:foldl(Folder, Acc, Rows), State}
-                         end,
-    decode_fold1(Folder, NewAcc, NewState).
+    case parse(fun csv_parser:parse/1, State) of
+        done ->
+            Acc;
+        {Rows, NewState} ->
+            NewAcc = lists:foldl(Folder, Acc, Rows),
+            decode_fold1(Folder, NewAcc, NewState)
+    end.
 
 binary_split_by_size(Bin, Size) ->
     case Size >= byte_size(Bin) of
