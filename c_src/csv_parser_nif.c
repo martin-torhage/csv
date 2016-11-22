@@ -53,7 +53,7 @@ struct csv_chunk {
 
 ErlNifResourceType* state_type;
 
-void size_column(struct column *column_ptr, int size) {
+void ensure_column_size(struct column *column_ptr, int size) {
   int new_size;
   if (column_ptr->data_ptr == NULL || column_ptr->allocated_size < size) {
     new_size = ((size + 100) / 100) * 100; // Correcto?
@@ -72,7 +72,7 @@ static void add_value(void *data_ptr, int size,
   struct column *column_ptr;
   if (row_buffer_ptr->col_n < MAX_COLS) {
     column_ptr = &row_buffer_ptr->cols[row_buffer_ptr->col_n];
-    size_column(column_ptr, size);
+    ensure_column_size(column_ptr, size);
     column_ptr->data_size = size;
     memcpy(column_ptr->data_ptr, data_ptr, size);
     row_buffer_ptr->col_n++;
