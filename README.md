@@ -10,8 +10,7 @@ Notes
 
 Todo
 ====
- - Only return the wanted column values to Erlang instead of all column values in the CSV.
- - Allocate less memory for `out_buffer` by only storing the wanted columns.
+ - Add encoding support.
 
 License
 =======
