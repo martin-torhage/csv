@@ -44,6 +44,8 @@ struct callback_state {
   struct out_buffer out_buffer;
   struct row_buffer *row_buffer_ptr;
   ErlNifEnv* env_ptr;
+  bool capture_all_columns;
+  bool *capture_map;
 };
 
 struct csv_chunk {
@@ -179,9 +181,13 @@ static void init_callback_state(struct callback_state *cb_state_ptr,
   cb_state_ptr->env_ptr = env_ptr;
   cb_state_ptr->out_buffer.row_n = 0;
   cb_state_ptr->row_buffer_ptr = &(state_ptr->row_buffer);
+  cb_state_ptr->capture_all_columns = true;
 }
 
-bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr) {
+static void set_capture_map(struct callback_state *cb_state_ptr, 
+
+bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr)
+{
   if (csv_buffer_ptr->data_ptr == NULL ||
       csv_buffer_ptr->size == 0 ||
       csv_buffer_ptr->consumed >= csv_buffer_ptr->size) {
@@ -360,12 +366,13 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
   struct callback_state cb_state;
   struct csv_chunk chunk;
 
-  if (argc != 1) {
+  if (argc != 2) {
     return enif_make_badarg(env_ptr);
   }
   if (!enif_get_resource(env_ptr, argv[0], state_type, (void**) &state_ptr)) {
     return enif_make_badarg(env_ptr);
   }
+  // Test and get argv[1]
   parser_ptr = &(state_ptr->parser);
 
   get_csv_chunk(&chunk, state_ptr, MAX_PARSE_SIZE);
