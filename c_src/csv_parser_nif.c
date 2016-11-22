@@ -8,7 +8,6 @@ typedef int bool;
 
 #define MAX_PARSE_SIZE 16
 #define MAX_ROWS_PER_BATCH MAX_PARSE_SIZE + 1
-#define MAX_COLS 1024
 
 #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 
@@ -19,8 +18,9 @@ struct column {
 };
 
 struct row_buffer {
-  struct column cols[MAX_COLS];
-  int col_n;
+  struct column *cols_ptr;
+  int allocated_n;
+  int used;
 };
 
 struct out_buffer {
@@ -65,18 +65,33 @@ void ensure_column_size(struct column *column_ptr, int size) {
   }
 }
 
+void ensure_row_buffer_space(struct row_buffer *row_buffer_ptr) {
+  struct column *new_cols_ptr;
+  int new_allocated_n;
+  if (row_buffer_ptr->used == row_buffer_ptr->allocated_n) {
+    new_allocated_n = row_buffer_ptr->allocated_n + 1;
+    enif_alloc(new_cols_ptr, new_allocated_n * sizeof(column));
+    memcpy(new_cols_ptr,
+           row_buffer_ptr->cols_ptr,
+           row_buffer_ptr->allocated_n * (sizeof struct *column));
+    enif_alloc(&new_cols_ptr[new_allocated_n - 1], (sizeof struct column));
+    enif_free(row_buffer_ptr->cols_ptr);
+    row_buffer_ptr->cols_ptr = new_cols_ptr;
+    row_buffer_ptr->allocated_n = new_allocated_n;
+  }
+}
+
 static void add_value(void *data_ptr, int size,
                       struct callback_state* cb_state_ptr)
 {
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
   struct column *column_ptr;
-  if (row_buffer_ptr->col_n < MAX_COLS) {
-    column_ptr = &row_buffer_ptr->cols[row_buffer_ptr->col_n];
-    ensure_column_size(column_ptr, size);
-    column_ptr->data_size = size;
-    memcpy(column_ptr->data_ptr, data_ptr, size);
-    row_buffer_ptr->col_n++;
-  }
+  ensure_row_buffer_space(row_buffer_ptr);
+  column_ptr = &row_buffer_ptr->cols_ptr[row_buffer_ptr->cols_used];
+  ensure_column_size(column_ptr, size);
+  column_ptr->data_size = size;
+  memcpy(column_ptr->data_ptr, data_ptr, size);
+  row_buffer_ptr->cols_used++;
 }
 
 static void add_row(struct callback_state* cb_state_ptr)
@@ -126,10 +141,12 @@ static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr)
 void init_row_buffer(struct row_buffer *row_buffer_ptr)
 {
   int i;
-  for (i = 0; i < MAX_COLS; i++) {
-    row_buffer_ptr->cols[i].data_ptr = NULL;
-  }
-  row_buffer_ptr->col_n = 0;
+  row_buffer_ptr->cols_ptr = NULL;
+  row_buffer_ptr->allocated_n = 0;
+  row_buffer_ptr->used = 0;
+  /* for (i = 0; i < MAX_COLS; i++) { */
+  /*   row_buffer_ptr->cols[i].data_ptr = NULL; */
+  /* } */
 }
 
 void init_csv_buffer(struct csv_buffer *csv_buffer_ptr)
@@ -347,9 +364,10 @@ void column_dtor(struct column *column_ptr) {
 
 void row_buffer_dtor(struct row_buffer *row_buffer_ptr) {
   int i;
-  for (i = 0; i < MAX_COLS; i++) {
-    column_dtor(&row_buffer_ptr->cols[i]);
+  for (i = 0; i < row_buffer_ptr->allocated_n; i++) {
+    column_dtor(&row_buffer_ptr->cols_ptr[i]);
   }
+  enif_free(row_buffer_ptr->cols_ptr);
 }
 void state_dtor(ErlNifEnv* env_ptr, void* obj_ptr)
 {
