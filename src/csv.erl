@@ -61,7 +61,7 @@ decode_fold1(Folder, Acc, #state{generator_state = done,
 decode_fold1(Folder, Acc, #state{parser_state = eob} = State) ->
     decode_fold1(Folder, Acc, feed_nif(State));
 decode_fold1(Folder, Acc, State) ->
-    {NewAcc, NewState} = case csv_parser:parse(State#state.parser) of
+    {NewAcc, NewState} = case csv_parser:parse(State#state.parser, [2, 1]) of
                              {error, eob} ->
                                  {Acc, State#state{parser_state = eob}};
                              {ok, Rows} ->
