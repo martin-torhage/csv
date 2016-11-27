@@ -4,9 +4,6 @@
          decode_binary/1,
          decode_gzip_fold/3]).
 
-%% Max size of each CSV batch to decode. This is also hardcoded in the
-%% NIF.
--define(MAX_BATCH_SIZE, 4096).
 -define(GZIP_HEADER_SIZE, 31).
 
 -record(state,
