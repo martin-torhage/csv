@@ -208,57 +208,50 @@ static struct state* init_state()
   return state_ptr;
 }
 
-static bool is_integer_list(ErlNifEnv* env_ptr, ERL_NIF_TERM list) {
-  unsigned len;
+static bool extract_capture_list(ErlNifEnv* env_ptr, ERL_NIF_TERM list,
+                                 int len, int *dst_ptr)
+{
   int i;
   ERL_NIF_TERM head;
   ERL_NIF_TERM tail;
   int item;
+
+  tail = list;
+  for (i = 0; i < len; i++) {
+    if (!enif_get_list_cell(env_ptr, tail, &head, &tail)) {
+      return false;
+    }
+    if (!enif_get_int(env_ptr, head, &item)) {
+      return false;
+    }
+    if (item < 0) {
+      return false;
+    }
+    dst_ptr[i] = item;
+  }
+  return true;
+}
+
+static bool update_capture(ErlNifEnv* env_ptr, struct state *state_ptr,
+                           ERL_NIF_TERM list) {
+  unsigned len;
+  int *indexes_new_ptr;
+  struct capture *capture_ptr;
 
   if (!enif_get_list_length(env_ptr, list, &len)) {
     return false;
   } else {
-    tail = list;
-    for (i = 0; i < len; i++) {
-      if (!enif_get_list_cell(env_ptr, tail, &head, &tail)) {
-        return false;
-      }
-      if (!enif_get_int(env_ptr, head, &item)) {
-        return false;
-      }
-      if (item < 1) {
-        return false;
-      }
+    indexes_new_ptr = enif_alloc(len * sizeof(int));
+    if (!extract_capture_list(env_ptr, list, len, indexes_new_ptr)) {
+      enif_free(indexes_new_ptr);
+      return false;
+    } else {
+      capture_ptr = &(state_ptr->capture);
+      enif_free(capture_ptr->indexes_ptr);
+      capture_ptr->indexes_ptr = indexes_new_ptr;
+      capture_ptr->size = len;
+      return true;
     }
-    return true;
-  }
-}
-
-void update_capture(ErlNifEnv* env_ptr,
-                    struct callback_state *cb_state_ptr,
-                    ERL_NIF_TERM list) {
-  unsigned len;
-  struct capture *capture_ptr;
-  int i;
-  ERL_NIF_TERM head;
-  ERL_NIF_TERM tail;
-  int item;
-
-  enif_get_list_length(env_ptr, list, &len);
-
-  capture_ptr = cb_state_ptr->capture_ptr;
-  if (capture_ptr->indexes_ptr != NULL) {
-    enif_free(capture_ptr->indexes_ptr);
-  }
-
-  capture_ptr->indexes_ptr = enif_alloc(len * sizeof(int));
-  capture_ptr->size = len;
-
-  tail = list;
-  for (i = 0; i < len; i++) {
-    enif_get_list_cell(env_ptr, tail, &head, &tail);
-    enif_get_int(env_ptr, head, &item);
-    capture_ptr->indexes_ptr[i] = item;
   }
 }
 
@@ -408,8 +401,26 @@ static ERL_NIF_TERM feed(ErlNifEnv* env_ptr, int argc,
   }
 }
 
-static ERL_NIF_TERM parse_one_full_row(ErlNifEnv* env_ptr, int argc,
-                                       const ERL_NIF_TERM argv[])
+static ERL_NIF_TERM set_capture(ErlNifEnv* env_ptr, int argc,
+                                const ERL_NIF_TERM argv[])
+{
+  struct state *state_ptr;
+
+  if (argc != 2) {
+    return enif_make_badarg(env_ptr);
+  }
+  if (!enif_get_resource(env_ptr, argv[0], state_type, (void**) &state_ptr)) {
+    return enif_make_badarg(env_ptr);
+  }
+  if (!update_capture(env_ptr, state_ptr, argv[1])) {
+    return enif_make_badarg(env_ptr);
+  }
+
+  return enif_make_atom(env_ptr, "ok");
+}
+
+static ERL_NIF_TERM parse_one_row(ErlNifEnv* env_ptr, int argc,
+                                  const ERL_NIF_TERM argv[])
 {
   struct state *state_ptr;
   struct csv_parser *parser_ptr;
@@ -451,13 +462,10 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
   struct callback_state cb_state;
   struct csv_chunk chunk;
 
-  if (argc != 2) {
+  if (argc != 1) {
     return enif_make_badarg(env_ptr);
   }
   if (!enif_get_resource(env_ptr, argv[0], state_type, (void**) &state_ptr)) {
-    return enif_make_badarg(env_ptr);
-  }
-  if (!is_integer_list(env_ptr, argv[1])) {
     return enif_make_badarg(env_ptr);
   }
   parser_ptr = &(state_ptr->parser);
@@ -469,7 +477,6 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
                             enif_make_atom(env_ptr, "eob"));
   } else {
     init_callback_state(&cb_state, env_ptr, state_ptr);
-    update_capture(env_ptr, &cb_state, argv[1]);
     if (csv_parse(parser_ptr, chunk.data_ptr, (size_t) chunk.size,
                   column_callback, row_callback, &cb_state) != chunk.size) {
       return error2(env_ptr,
@@ -486,8 +493,9 @@ static ErlNifFunc nif_funcs[] =
     {"init", 0, init},
     {"close", 1, close},
     {"feed", 2, feed},
-    {"parse_one_full_row", 1, parse_one_full_row},
-    {"parse", 2, parse},
+    {"set_capture", 2, set_capture},
+    {"parse_one_row", 1, parse_one_row},
+    {"parse", 1, parse},
   };
 
 void csv_buffer_dtor(struct csv_buffer *csv_buffer_ptr) {
