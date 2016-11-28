@@ -17,10 +17,10 @@ run(Filename) ->
 %% Internal
 
 start_utimer() ->
-    erlang:system_time(microsecond).
+    erlang:system_time(micro_seconds).
 
 stop_utimer(Timer) ->
-    erlang:system_time(microsecond) - Timer.
+    erlang:system_time(micro_seconds) - Timer.
 
 divide_and_round(_, 0) ->
     infinity;
