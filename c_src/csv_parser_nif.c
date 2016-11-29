@@ -12,14 +12,14 @@ typedef int bool;
 
 #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 
-struct column {
+struct cell {
   char *data_ptr;
   int allocated_size;
   int data_size;
 };
 
 struct row_buffer {
-  struct column *cols_ptr;
+  struct cell *cells_ptr;
   int allocated_n;
   int cols_used;
 };
@@ -66,26 +66,28 @@ static size_t align_cell_size(size_t size)
   return ceil(size / 16.0) * 16;
 }
 
-static void ensure_column_size(struct column *column_ptr, int size)
+static void ensure_cell_size(struct cell *cell_ptr, int size)
 {
   int new_size;
-  if (column_ptr->data_ptr == NULL || column_ptr->allocated_size < size) {
-    if (column_ptr->data_ptr != NULL) {
-      enif_free(column_ptr->data_ptr);
+
+  if (cell_ptr->data_ptr == NULL || cell_ptr->allocated_size < size) {
+    if (cell_ptr->data_ptr != NULL) {
+      enif_free(cell_ptr->data_ptr);
     }
     new_size = align_cell_size(size);
-    column_ptr->data_ptr = enif_alloc(new_size);
-    column_ptr->allocated_size = new_size;
+    cell_ptr->data_ptr = enif_alloc(new_size);
+    cell_ptr->allocated_size = new_size;
   }
 }
 
-static struct column empty_column()
+static struct cell empty_cell()
 {
-  struct column col;
-  col.data_ptr = NULL;
-  col.allocated_size = 0;
-  col.data_size = 0;
-  return col;
+  struct cell cell;
+
+  cell.data_ptr = NULL;
+  cell.allocated_size = 0;
+  cell.data_size = 0;
+  return cell;
 }
 
 static bool is_output_column(struct callback_state* cb_state_ptr, int col_i)
@@ -106,37 +108,37 @@ static bool is_output_column(struct callback_state* cb_state_ptr, int col_i)
 
 static void ensure_row_buffer_space(struct row_buffer *row_buffer_ptr)
 {
-  struct column *new_cols_ptr;
+  struct cell *new_cells_ptr;
   int new_allocated_n;
   int i;
 
   if (row_buffer_ptr->cols_used == row_buffer_ptr->allocated_n) {
     new_allocated_n = row_buffer_ptr->allocated_n + 5;
-    new_cols_ptr = enif_alloc(sizeof(struct column) * new_allocated_n);
-    memcpy(new_cols_ptr,
-           row_buffer_ptr->cols_ptr,
-           sizeof(struct column) * row_buffer_ptr->allocated_n);
+    new_cells_ptr = enif_alloc(sizeof(struct cell) * new_allocated_n);
+    memcpy(new_cells_ptr,
+           row_buffer_ptr->cells_ptr,
+           sizeof(struct cell) * row_buffer_ptr->allocated_n);
     for (i = row_buffer_ptr->allocated_n; i < new_allocated_n; i++) {
-      new_cols_ptr[i] = empty_column();
+      new_cells_ptr[i] = empty_cell();
     }
-    enif_free(row_buffer_ptr->cols_ptr);
-    row_buffer_ptr->cols_ptr = new_cols_ptr;
+    enif_free(row_buffer_ptr->cells_ptr);
+    row_buffer_ptr->cells_ptr = new_cells_ptr;
     row_buffer_ptr->allocated_n = new_allocated_n;
   }
 }
 
-static void add_value(void *data_ptr, int size,
-                      struct callback_state* cb_state_ptr)
+static void add_cell(void *data_ptr, int size,
+                     struct callback_state* cb_state_ptr)
 {
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
-  struct column *column_ptr;
+  struct cell *cell_ptr;
 
   ensure_row_buffer_space(row_buffer_ptr);
   if (is_output_column(cb_state_ptr, row_buffer_ptr->cols_used)) {
-    column_ptr = &row_buffer_ptr->cols_ptr[row_buffer_ptr->cols_used];
-    ensure_column_size(column_ptr, size);
-    column_ptr->data_size = size;
-    memcpy(column_ptr->data_ptr, data_ptr, size);
+    cell_ptr = &row_buffer_ptr->cells_ptr[row_buffer_ptr->cols_used];
+    ensure_cell_size(cell_ptr, size);
+    cell_ptr->data_size = size;
+    memcpy(cell_ptr->data_ptr, data_ptr, size);
   }
   row_buffer_ptr->cols_used++;
 }
@@ -155,8 +157,8 @@ static int make_output_terms(struct callback_state* cb_state_ptr,
     for (out_i = 0; out_i < cols_used; out_i++) {
       out_terms_ptr[out_i] =
         enif_make_string_len(env_ptr,
-                             row_buffer_ptr->cols_ptr[out_i].data_ptr,
-                             row_buffer_ptr->cols_ptr[out_i].data_size,
+                             row_buffer_ptr->cells_ptr[out_i].data_ptr,
+                             row_buffer_ptr->cells_ptr[out_i].data_size,
                              ERL_NIF_LATIN1);
     }
   } else {
@@ -164,8 +166,8 @@ static int make_output_terms(struct callback_state* cb_state_ptr,
       capture_i = capture_ptr->indexes_ptr[out_i];
       out_terms_ptr[out_i] =
         enif_make_string_len(env_ptr,
-                             row_buffer_ptr->cols_ptr[capture_i].data_ptr,
-                             row_buffer_ptr->cols_ptr[capture_i].data_size,
+                             row_buffer_ptr->cells_ptr[capture_i].data_ptr,
+                             row_buffer_ptr->cells_ptr[capture_i].data_size,
                              ERL_NIF_LATIN1);
     }
   }
@@ -192,9 +194,9 @@ static void add_row(struct callback_state* cb_state_ptr)
 static void column_callback (void *data_ptr, size_t size,
                              void *cb_state_void_ptr)
 {
-  add_value(data_ptr,
-            size,
-            (struct callback_state*) cb_state_void_ptr);
+  add_cell(data_ptr,
+           size,
+           (struct callback_state*) cb_state_void_ptr);
 }
 
 static void row_callback (int c, void *cb_state_void_ptr)
@@ -215,7 +217,7 @@ static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr)
 
 static void init_row_buffer(struct row_buffer *row_buffer_ptr)
 {
-  row_buffer_ptr->cols_ptr = NULL;
+  row_buffer_ptr->cells_ptr = NULL;
   row_buffer_ptr->allocated_n = 0;
   row_buffer_ptr->cols_used = 0;
 }
@@ -545,10 +547,10 @@ static void csv_buffer_dtor(struct csv_buffer *csv_buffer_ptr)
   }
 }
 
-static void column_dtor(struct column *column_ptr)
+static void cell_dtor(struct cell *cell_ptr)
 {
-  if (column_ptr->data_ptr != NULL) {
-    enif_free(column_ptr->data_ptr);
+  if (cell_ptr->data_ptr != NULL) {
+    enif_free(cell_ptr->data_ptr);
   }
 }
 
@@ -557,9 +559,9 @@ static void row_buffer_dtor(struct row_buffer *row_buffer_ptr)
   int i;
 
   for (i = 0; i < row_buffer_ptr->allocated_n; i++) {
-    column_dtor(&row_buffer_ptr->cols_ptr[i]);
+    cell_dtor(&row_buffer_ptr->cells_ptr[i]);
   }
-  enif_free(row_buffer_ptr->cols_ptr);
+  enif_free(row_buffer_ptr->cells_ptr);
 }
 
 static void capture_dtor(struct capture *capture_ptr)
