@@ -60,7 +60,8 @@ struct csv_chunk {
 
 ErlNifResourceType* state_type;
 
-void ensure_column_size(struct column *column_ptr, int size) {
+static void ensure_column_size(struct column *column_ptr, int size)
+{
   int new_size;
   if (column_ptr->data_ptr == NULL || column_ptr->allocated_size < size) {
     new_size = ((size + 100) / 100) * 100; // Correcto?
@@ -72,7 +73,8 @@ void ensure_column_size(struct column *column_ptr, int size) {
   }
 }
 
-struct column empty_column() {
+static struct column empty_column()
+{
   struct column col;
   col.data_ptr = NULL;
   col.allocated_size = 0;
@@ -80,7 +82,8 @@ struct column empty_column() {
   return col;
 }
 
-bool is_output_column(struct callback_state* cb_state_ptr, int col_i) {
+static bool is_output_column(struct callback_state* cb_state_ptr, int col_i)
+{
   int i;
 
   if (cb_state_ptr->capture_ptr->indexes_ptr == NULL) {
@@ -95,10 +98,12 @@ bool is_output_column(struct callback_state* cb_state_ptr, int col_i) {
   }
 }
 
-void ensure_row_buffer_space(struct row_buffer *row_buffer_ptr) {
+static void ensure_row_buffer_space(struct row_buffer *row_buffer_ptr)
+{
   struct column *new_cols_ptr;
   int new_allocated_n;
   int i;
+
   if (row_buffer_ptr->cols_used == row_buffer_ptr->allocated_n) {
     new_allocated_n = row_buffer_ptr->allocated_n + 5;
     new_cols_ptr = enif_alloc(sizeof(struct column) * new_allocated_n);
@@ -119,6 +124,7 @@ static void add_value(void *data_ptr, int size,
 {
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
   struct column *column_ptr;
+
   ensure_row_buffer_space(row_buffer_ptr);
   if (is_output_column(cb_state_ptr, row_buffer_ptr->cols_used)) {
     column_ptr = &row_buffer_ptr->cols_ptr[row_buffer_ptr->cols_used];
@@ -138,6 +144,7 @@ static void add_row(struct callback_state* cb_state_ptr)
   int col_i;
   int out_col_i;
   int cols_used = row_buffer_ptr->cols_used;
+
   if (out_buffer_ptr->row_n < MAX_ROWS_PER_BATCH) {
     out_col_i = 0;
     for (col_i = 0; col_i < cols_used; col_i++) {
@@ -157,14 +164,15 @@ static void add_row(struct callback_state* cb_state_ptr)
   }
 }
 
-void column_callback (void *data_ptr, size_t size, void *cb_state_void_ptr)
+static void column_callback (void *data_ptr, size_t size,
+                             void *cb_state_void_ptr)
 {
   add_value(data_ptr,
             size,
             (struct callback_state*) cb_state_void_ptr);
 }
 
-void row_callback (int c, void *cb_state_void_ptr)
+static void row_callback (int c, void *cb_state_void_ptr)
 {
   add_row((struct callback_state*) cb_state_void_ptr);
 }
@@ -174,25 +182,26 @@ static ERL_NIF_TERM make_output(struct callback_state *cb_state_ptr)
   ERL_NIF_TERM ret;
   ErlNifEnv* env_ptr = cb_state_ptr->env_ptr;
   struct out_buffer out_buffer = cb_state_ptr->out_buffer;
+
   ret = enif_make_list_from_array(env_ptr, out_buffer.rows, out_buffer.row_n);
   out_buffer.row_n = 0;
   return ret;
 }
 
-void init_row_buffer(struct row_buffer *row_buffer_ptr)
+static void init_row_buffer(struct row_buffer *row_buffer_ptr)
 {
   row_buffer_ptr->cols_ptr = NULL;
   row_buffer_ptr->allocated_n = 0;
   row_buffer_ptr->cols_used = 0;
 }
 
-void init_csv_buffer(struct csv_buffer *csv_buffer_ptr)
+static void init_csv_buffer(struct csv_buffer *csv_buffer_ptr)
 {
   csv_buffer_ptr->data_ptr = NULL;
   csv_buffer_ptr->size = 0;
 }
 
-void init_capture(struct capture *capture_ptr) {
+static void init_capture(struct capture *capture_ptr) {
   capture_ptr->indexes_ptr = NULL;
 }
 
@@ -233,7 +242,8 @@ static bool extract_capture_list(ErlNifEnv* env_ptr, ERL_NIF_TERM list,
 }
 
 static bool update_capture(ErlNifEnv* env_ptr, struct state *state_ptr,
-                           ERL_NIF_TERM list) {
+                           ERL_NIF_TERM list)
+{
   unsigned len;
   int *indexes_new_ptr;
   struct capture *capture_ptr;
@@ -264,7 +274,7 @@ static void init_callback_state(struct callback_state *cb_state_ptr,
   cb_state_ptr->capture_ptr = &(state_ptr->capture);
 }
 
-bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr)
+static bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr)
 {
   if (csv_buffer_ptr->data_ptr == NULL ||
       csv_buffer_ptr->size == 0 ||
@@ -275,8 +285,8 @@ bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr)
   }
 }
 
-void get_csv_chunk(struct csv_chunk *chunk_ptr, struct state *state_ptr,
-                   int max_len)
+static void get_csv_chunk(struct csv_chunk *chunk_ptr, struct state *state_ptr,
+                          int max_len)
 {
   struct csv_buffer *csv_buffer_ptr;
   int bytes_read;
@@ -293,27 +303,29 @@ void get_csv_chunk(struct csv_chunk *chunk_ptr, struct state *state_ptr,
   }
 }
 
-ERL_NIF_TERM ok_tuple(ErlNifEnv* env_ptr, ERL_NIF_TERM term)
+static ERL_NIF_TERM ok_tuple(ErlNifEnv* env_ptr, ERL_NIF_TERM term)
 {
   ERL_NIF_TERM ok_atom = enif_make_atom(env_ptr, "ok");
+
   return enif_make_tuple2(env_ptr, ok_atom, term);
 }
 
-ERL_NIF_TERM error_tuple(ErlNifEnv* env_ptr, ERL_NIF_TERM term)
+static ERL_NIF_TERM error_tuple(ErlNifEnv* env_ptr, ERL_NIF_TERM term)
 {
   ERL_NIF_TERM error_atom = enif_make_atom(env_ptr, "error");
+
   return enif_make_tuple2(env_ptr, error_atom, term);
 }
 
-ERL_NIF_TERM error(ErlNifEnv* env_ptr, const char* reason)
+static ERL_NIF_TERM error(ErlNifEnv* env_ptr, const char* reason)
 {
   return error_tuple(env_ptr, enif_make_string(env_ptr,
                                                reason,
                                                ERL_NIF_LATIN1));
 }
 
-ERL_NIF_TERM error2(ErlNifEnv* env_ptr, const char* reason1,
-                    const char* reason2)
+static ERL_NIF_TERM error2(ErlNifEnv* env_ptr, const char* reason1,
+                           const char* reason2)
 {
   return error_tuple(env_ptr,
                      enif_make_tuple2(env_ptr,
@@ -498,39 +510,45 @@ static ErlNifFunc nif_funcs[] =
     {"parse", 1, parse},
   };
 
-void csv_buffer_dtor(struct csv_buffer *csv_buffer_ptr) {
+static void csv_buffer_dtor(struct csv_buffer *csv_buffer_ptr)
+{
   if (csv_buffer_ptr->data_ptr != NULL) {
     enif_free(csv_buffer_ptr->data_ptr);
   }
 }
 
-void column_dtor(struct column *column_ptr) {
+static void column_dtor(struct column *column_ptr)
+{
   if (column_ptr->data_ptr != NULL) {
     enif_free(column_ptr->data_ptr);
   }
 }
 
-void row_buffer_dtor(struct row_buffer *row_buffer_ptr) {
+static void row_buffer_dtor(struct row_buffer *row_buffer_ptr)
+{
   int i;
+
   for (i = 0; i < row_buffer_ptr->allocated_n; i++) {
     column_dtor(&row_buffer_ptr->cols_ptr[i]);
   }
   enif_free(row_buffer_ptr->cols_ptr);
 }
 
-void capture_dtor(struct capture *capture_ptr) {
+static void capture_dtor(struct capture *capture_ptr)
+{
   if (capture_ptr->indexes_ptr != NULL) {
     enif_free(capture_ptr->indexes_ptr);
   }
 }
 
-void state_dtor(ErlNifEnv* env_ptr, void* obj_ptr)
+static void state_dtor(ErlNifEnv* env_ptr, void* obj_ptr)
 {
   struct state* state_ptr = (struct state*) obj_ptr;
   struct csv_parser *parser_ptr = &(state_ptr->parser);
   struct csv_buffer *csv_buffer_ptr = &(state_ptr->csv_buffer);
   struct row_buffer *row_buffer_ptr = &(state_ptr->row_buffer);
   struct capture *capture_ptr = &(state_ptr->capture);
+
   csv_free(parser_ptr);
   csv_buffer_dtor(csv_buffer_ptr);
   row_buffer_dtor(row_buffer_ptr);
@@ -543,6 +561,7 @@ static int load(ErlNifEnv* env_ptr, void** priv, ERL_NIF_TERM info)
   int flags = ERL_NIF_RT_CREATE;
   state_type = enif_open_resource_type(env_ptr, NULL, "state",
                                        state_dtor, flags, NULL);
+
   if (state_type == NULL) {
     return 1;
   } else {
