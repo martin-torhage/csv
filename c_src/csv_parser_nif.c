@@ -376,7 +376,7 @@ static ERL_NIF_TERM feed(ErlNifEnv* env_ptr, int argc,
   struct csv_buffer *csv_buffer_ptr;
 
   if (argc != 2) {
-     return enif_make_badarg(env_ptr);
+    return enif_make_badarg(env_ptr);
   }
   if (!enif_get_resource(env_ptr, argv[0], state_type, (void**) &state_ptr)) {
     return enif_make_badarg(env_ptr);
