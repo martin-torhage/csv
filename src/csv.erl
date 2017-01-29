@@ -1,12 +1,12 @@
 -module(csv).
--export([decode_fold/3,
-         decode_fold/4,
+-export([decode_binary/1,
+         decode_binary/2,
          decode_binary_fold/3,
          decode_binary_fold/4,
-         decode_binary/1,
-         decode_binary/2,
          decode_gzip_fold/3,
-         decode_gzip_fold/4]).
+         decode_gzip_fold/4,
+         decode_fold/3,
+         decode_fold/4]).
 
 -define(DEFAULT_OPTIONS, [{delimiter, comma},
                           {return, list}]).
@@ -23,6 +23,42 @@
          generator       :: fun(),
          generator_state :: term(),
          options         :: list()}).
+
+decode_binary(Csv) ->
+    decode_binary(Csv, ?DEFAULT_OPTIONS).
+
+decode_binary(Csv, Options) when is_binary(Csv) ->
+    Folder = fun(Row, Acc) -> [Row | Acc] end,
+    lists:reverse(decode_binary_fold(Folder, [], Csv, Options)).
+
+decode_binary_fold(Folder, AccIn, Csv) ->
+    decode_binary_fold(Folder, AccIn, Csv, ?DEFAULT_OPTIONS).
+
+decode_binary_fold(Folder, AccIn, Csv, Options) when is_binary(Csv) ->
+    Generator = fun(init_state) ->
+                        {Csv, done}
+                end,
+    decode_fold(Folder, AccIn, {Generator, init_state}, Options).
+
+decode_gzip_fold(Folder, AccIn, CsvGzip) ->
+    decode_gzip_fold(Folder, AccIn, CsvGzip, ?DEFAULT_OPTIONS).
+
+decode_gzip_fold(Folder, AccIn, CsvGzip, Options) when is_binary(CsvGzip) ->
+    Z = zlib:open(),
+    ok = zlib:inflateInit(Z, ?GZIP_HEADER_SIZE),
+    Generator =
+        fun(Gzip) ->
+                {GzipHead, GzipRest} = binary_split_by_size(Gzip, 16 * 1024),
+                case zlib:inflate(Z, GzipHead) of
+                    [] when GzipRest =:= <<>> ->
+                        ok = zlib:inflateEnd(Z),
+                        ok = zlib:close(Z),
+                        {<<>>, done};
+                    IoList ->
+                        {iolist_to_binary(IoList), GzipRest}
+                end
+        end,
+    decode_fold(Folder, AccIn, {Generator, CsvGzip}, Options).
 
 decode_fold(Folder, AccIn, Generator) ->
     decode_fold(Folder, AccIn, Generator, ?DEFAULT_OPTIONS).
@@ -47,43 +83,16 @@ decode_fold(Folder, AccIn, {Generator, GeneratorState}, Options) ->
                    options = Options},
     decode_fold1(Folder, AccIn, State).
 
-decode_binary_fold(Folder, AccIn, Csv) ->
-    decode_binary_fold(Folder, AccIn, Csv, ?DEFAULT_OPTIONS).
-
-decode_binary_fold(Folder, AccIn, Csv, Options) when is_binary(Csv) ->
-    Generator = fun(init_state) ->
-                        {Csv, done}
-                end,
-    decode_fold(Folder, AccIn, {Generator, init_state}, Options).
-
-decode_binary(Csv) ->
-    decode_binary(Csv, ?DEFAULT_OPTIONS).
-
-decode_binary(Csv, Options) when is_binary(Csv) ->
-    Folder = fun(Row, Acc) -> [Row | Acc] end,
-    lists:reverse(decode_binary_fold(Folder, [], Csv, Options)).
-
-decode_gzip_fold(Folder, AccIn, CsvGzip) ->
-    decode_gzip_fold(Folder, AccIn, CsvGzip, ?DEFAULT_OPTIONS).
-
-decode_gzip_fold(Folder, AccIn, CsvGzip, Options) when is_binary(CsvGzip) ->
-    Z = zlib:open(),
-    ok = zlib:inflateInit(Z, ?GZIP_HEADER_SIZE),
-    Generator =
-        fun(Gzip) ->
-                {GzipHead, GzipRest} = binary_split_by_size(Gzip, 16 * 1024),
-                case zlib:inflate(Z, GzipHead) of
-                    [] when GzipRest =:= <<>> ->
-                        ok = zlib:inflateEnd(Z),
-                        ok = zlib:close(Z),
-                        {<<>>, done};
-                    IoList ->
-                        {iolist_to_binary(IoList), GzipRest}
-                end
-        end,
-    decode_fold(Folder, AccIn, {Generator, CsvGzip}, Options).
-
 %% Internal
+
+binary_split_by_size(Bin, Size) ->
+    case Size >= byte_size(Bin) of
+        true ->
+            {Bin, <<>>};
+        false ->
+            {binary:part(Bin, 0, Size),
+             binary:part(Bin, Size, byte_size(Bin) - Size)}
+    end.
 
 decode_n_rows(State, N) ->
     decode_n_rows(State, N, []).
@@ -138,24 +147,6 @@ parser_option({return, binary}) ->
 parser_option({return, list}) ->
     ?OPTION_RETURN_LIST.
 
-decode_fold1(Folder, Acc, State) ->
-    case parse(fun csv_parser:parse/1, State) of
-        done ->
-            Acc;
-        {Rows, NewState} ->
-            NewAcc = lists:foldl(Folder, Acc, Rows),
-            decode_fold1(Folder, NewAcc, NewState)
-    end.
-
-binary_split_by_size(Bin, Size) ->
-    case Size >= byte_size(Bin) of
-        true ->
-            {Bin, <<>>};
-        false ->
-            {binary:part(Bin, 0, Size),
-             binary:part(Bin, Size, byte_size(Bin) - Size)}
-    end.
-
 feed_nif(State) ->
     #state{generator = Generator,
            generator_state = GeneratorState,
@@ -164,3 +155,12 @@ feed_nif(State) ->
     ok = csv_parser:feed(Parser, CsvChunk),
     State#state{generator_state = NewGeneratorState,
                 parser_state = has_csv}.
+
+decode_fold1(Folder, Acc, State) ->
+    case parse(fun csv_parser:parse/1, State) of
+        done ->
+            Acc;
+        {Rows, NewState} ->
+            NewAcc = lists:foldl(Folder, Acc, Rows),
+            decode_fold1(Folder, NewAcc, NewState)
+    end.
