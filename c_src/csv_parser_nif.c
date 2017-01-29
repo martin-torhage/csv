@@ -17,8 +17,8 @@ typedef int bool;
 
 struct cell {
   char *data_ptr;
-  int allocated_size;
-  int data_size;
+  size_t allocated_size;
+  size_t data_size;
 };
 
 struct row_buffer {
@@ -34,8 +34,8 @@ struct out_buffer {
 
 struct csv_buffer {
   char *data_ptr;
-  int size;
-  int consumed;
+  size_t size;
+  size_t consumed;
 };
 
 struct capture {
@@ -61,7 +61,7 @@ struct callback_state {
 
 struct csv_chunk {
   char *data_ptr;
-  int size;
+  size_t size;
 };
 
 ErlNifResourceType* state_type;
@@ -71,9 +71,9 @@ static size_t align_cell_size(size_t size)
   return ceil(size / 16.0) * 16;
 }
 
-static void ensure_cell_size(struct cell *cell_ptr, int size)
+static void ensure_cell_size(struct cell *cell_ptr, size_t size)
 {
-  int new_size;
+  size_t new_size;
 
   if (cell_ptr->data_ptr == NULL || cell_ptr->allocated_size < size) {
     if (cell_ptr->data_ptr != NULL) {
@@ -132,7 +132,7 @@ static void ensure_row_buffer_space(struct row_buffer *row_buffer_ptr)
   }
 }
 
-static void add_cell(void *data_ptr, int size,
+static void add_cell(void *data_ptr, size_t size,
                      struct callback_state* cb_state_ptr)
 {
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
@@ -148,7 +148,7 @@ static void add_cell(void *data_ptr, int size,
   row_buffer_ptr->cols_used++;
 }
 
-ERL_NIF_TERM make_output_binary(ErlNifEnv* env_ptr, char *data_ptr, int size)
+ERL_NIF_TERM make_output_binary(ErlNifEnv* env_ptr, char *data_ptr, size_t size)
 {
   ERL_NIF_TERM out_term;
   unsigned char *out_term_data_ptr;
@@ -159,7 +159,7 @@ ERL_NIF_TERM make_output_binary(ErlNifEnv* env_ptr, char *data_ptr, int size)
 }
 
 ERL_NIF_TERM make_output_term(ErlNifEnv* env_ptr, char *data_ptr,
-                              int size, unsigned options)
+                              size_t size, unsigned options)
 {
   if (options & OPTION_RETURN_BINARY) {
     return make_output_binary(env_ptr, data_ptr, size);
@@ -343,10 +343,10 @@ static bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr)
 }
 
 static void get_csv_chunk(struct csv_chunk *chunk_ptr, struct state *state_ptr,
-                          int max_len)
+                          size_t max_len)
 {
   struct csv_buffer *csv_buffer_ptr;
-  int bytes_read;
+  size_t bytes_read;
 
   csv_buffer_ptr = &state_ptr->csv_buffer;
   if (is_csv_buffer_empty(csv_buffer_ptr)) {
@@ -536,7 +536,7 @@ static ERL_NIF_TERM parse_one_row(ErlNifEnv* env_ptr, int argc,
                               enif_make_atom(env_ptr, "error"),
                               enif_make_atom(env_ptr, "eob"));
     } else {
-      if (csv_parse(parser_ptr, chunk.data_ptr, (size_t) chunk.size,
+      if (csv_parse(parser_ptr, chunk.data_ptr, chunk.size,
                     column_callback, row_callback, &cb_state) != chunk.size) {
         return error2(env_ptr,
                       "csv_parse failed",
@@ -570,7 +570,7 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
                             enif_make_atom(env_ptr, "eob"));
   } else {
     init_callback_state(&cb_state, env_ptr, state_ptr);
-    if (csv_parse(parser_ptr, chunk.data_ptr, (size_t) chunk.size,
+    if (csv_parse(parser_ptr, chunk.data_ptr, chunk.size,
                   column_callback, row_callback, &cb_state) != chunk.size) {
       return error2(env_ptr,
                     "csv_parse failed",
