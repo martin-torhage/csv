@@ -22,7 +22,8 @@ teardown(ok) ->
     ok.
 
 decode_binary() ->
-    Csv = <<"col1,col2,\"col with a \"\"\",col4\nonly column in row 2">>,
+    Csv = <<"col1,col2,\"col with a \"\"\",col4\n"
+            "only column in row 2">>,
     Expected = [["col1", "col2", "col with a \"", "col4"],
                 ["only column in row 2"]],
     Actual = csv:decode_binary(Csv),
@@ -38,7 +39,8 @@ decode_to_binary() ->
     ?assertEqual(Expected, Actual).
 
 decode_tabbed_binary() ->
-    Csv = <<"col1\tcol2\tcol3\rv1\t\"v2\"\tv,a,l,u,e,3">>,
+    Csv = <<"col1\tcol2\tcol3\r"
+            "v1\t\"v2\"\tv,a,l,u,e,3">>,
     Expected = [["col1", "col2", "col3"],
                 ["v1", "v2", "v,a,l,u,e,3"]],
     Options = [{delimiter, tab}],
