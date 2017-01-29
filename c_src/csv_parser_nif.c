@@ -23,13 +23,13 @@ struct cell {
 
 struct row_buffer {
   struct cell *cells_ptr;
-  int allocated_n;
-  int cols_used;
+  unsigned allocated_n;
+  unsigned cols_used;
 };
 
 struct out_buffer {
   ERL_NIF_TERM rows[MAX_ROWS_PER_BATCH];
-  int row_n;
+  unsigned row_n;
 };
 
 struct csv_buffer {
@@ -39,8 +39,8 @@ struct csv_buffer {
 };
 
 struct capture {
-  int *indexes_ptr;
-  int size;
+  unsigned *indexes_ptr;
+  unsigned size;
 };
 
 struct state {
@@ -97,7 +97,7 @@ static struct cell empty_cell()
 
 static bool is_output_column(struct callback_state* cb_state_ptr, int col_i)
 {
-  int i;
+  unsigned i;
 
   if (cb_state_ptr->capture_ptr->indexes_ptr == NULL) {
     return true;
@@ -114,8 +114,8 @@ static bool is_output_column(struct callback_state* cb_state_ptr, int col_i)
 static void ensure_row_buffer_space(struct row_buffer *row_buffer_ptr)
 {
   struct cell *new_cells_ptr;
-  int new_allocated_n;
-  int i;
+  unsigned new_allocated_n;
+  unsigned i;
 
   if (row_buffer_ptr->cols_used == row_buffer_ptr->allocated_n) {
     new_allocated_n = row_buffer_ptr->allocated_n + 5;
@@ -171,15 +171,15 @@ ERL_NIF_TERM make_output_term(ErlNifEnv* env_ptr, char *data_ptr,
   }
 }
 
-static int make_output_terms(struct callback_state* cb_state_ptr,
-                             ERL_NIF_TERM *out_terms_ptr)
+static unsigned make_output_terms(struct callback_state* cb_state_ptr,
+                                  ERL_NIF_TERM *out_terms_ptr)
 {
   ErlNifEnv* env_ptr = cb_state_ptr->env_ptr;
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
   struct capture *capture_ptr = cb_state_ptr->capture_ptr;
-  int cols_used = row_buffer_ptr->cols_used;
-  int out_i;
-  int capture_i;
+  unsigned cols_used = row_buffer_ptr->cols_used;
+  unsigned out_i;
+  unsigned capture_i;
 
   if (capture_ptr->indexes_ptr == NULL) {
     for (out_i = 0; out_i < cols_used; out_i++) {
@@ -208,7 +208,7 @@ static void add_row(struct callback_state* cb_state_ptr)
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
   ErlNifEnv* env_ptr = cb_state_ptr->env_ptr;
   ERL_NIF_TERM out_cells[row_buffer_ptr->cols_used];
-  int out_cells_used;
+  unsigned out_cells_used;
 
   if (out_buffer_ptr->row_n < MAX_ROWS_PER_BATCH) {
     out_cells_used = make_output_terms(cb_state_ptr, out_cells);
@@ -274,22 +274,19 @@ static struct state* init_state(unsigned options)
 }
 
 static bool extract_capture_list(ErlNifEnv* env_ptr, ERL_NIF_TERM list,
-                                 int len, int *dst_ptr)
+                                 unsigned len, unsigned *dst_ptr)
 {
-  int i;
+  unsigned i;
   ERL_NIF_TERM head;
   ERL_NIF_TERM tail;
-  int item;
+  unsigned item;
 
   tail = list;
   for (i = 0; i < len; i++) {
     if (!enif_get_list_cell(env_ptr, tail, &head, &tail)) {
       return false;
     }
-    if (!enif_get_int(env_ptr, head, &item)) {
-      return false;
-    }
-    if (item < 0) {
+    if (!enif_get_uint(env_ptr, head, &item)) {
       return false;
     }
     dst_ptr[i] = item;
@@ -301,13 +298,13 @@ static bool update_capture(ErlNifEnv* env_ptr, struct state *state_ptr,
                            ERL_NIF_TERM list)
 {
   unsigned len;
-  int *indexes_new_ptr;
+  unsigned *indexes_new_ptr;
   struct capture *capture_ptr;
 
   if (!enif_get_list_length(env_ptr, list, &len)) {
     return false;
   } else {
-    indexes_new_ptr = enif_alloc(len * sizeof(int));
+    indexes_new_ptr = enif_alloc(len * sizeof(unsigned));
     if (!extract_capture_list(env_ptr, list, len, indexes_new_ptr)) {
       enif_free(indexes_new_ptr);
       return false;
@@ -607,7 +604,7 @@ static void cell_dtor(struct cell *cell_ptr)
 
 static void row_buffer_dtor(struct row_buffer *row_buffer_ptr)
 {
-  int i;
+  unsigned i;
 
   for (i = 0; i < row_buffer_ptr->allocated_n; i++) {
     cell_dtor(&row_buffer_ptr->cells_ptr[i]);
