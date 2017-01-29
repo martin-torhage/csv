@@ -6,8 +6,10 @@ csv_test_() ->
     {foreach,
      fun setup/0,
      fun teardown/1,
-     [{"Should decode binary",
+     [{"Should decode a binary",
        ?_test(decode_binary())},
+      {"Should decode to binary",
+       ?_test(decode_to_binary())},
       {"Should decode tab separated",
        ?_test(decode_tabbed_binary())},
       {"Should decode only selected columns",
@@ -24,6 +26,15 @@ decode_binary() ->
     Expected = [["col1", "col2", "col with a \"", "col4"],
                 ["only column in row 2"]],
     Actual = csv:decode_binary(Csv),
+    ?assertEqual(Expected, Actual).
+
+decode_to_binary() ->
+    Csv = <<"col1,col2,col3\n"
+            "val1,val2,val3">>,
+    Expected = [[<<"col1">>, <<"col2">>, <<"col3">>],
+                [<<"val1">>, <<"val2">>, <<"val3">>]],
+    Options = [{return, binary}],
+    Actual = csv:decode_binary(Csv, Options),
     ?assertEqual(Expected, Actual).
 
 decode_tabbed_binary() ->
