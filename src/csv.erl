@@ -1,21 +1,34 @@
 -module(csv).
 -export([decode_fold/3,
+         decode_fold/4,
          decode_binary_fold/3,
+         decode_binary_fold/4,
          decode_binary/1,
-         decode_gzip_fold/3]).
+         decode_binary/2,
+         decode_gzip_fold/3,
+         decode_gzip_fold/4]).
 
 -define(GZIP_HEADER_SIZE, 31).
+-define(OPTION_COMMA_DELIMITED, 0).
+-define(OPTION_TAB_DELIMITED, 1).
+-define(DEFAULT_OPTIONS, [{delimiter, comma}]).
 
 -record(state,
         {parser          :: term(),
          parser_state    :: has_csv | eob,
          generator       :: fun(),
-         generator_state :: term()}).
+         generator_state :: term(),
+         options         :: list()}).
 
-decode_fold({maker, FolderMaker}, AccIn, {Generator, GeneratorState}) ->
+decode_fold(Folder, AccIn, Generator) ->
+    decode_fold(Folder, AccIn, Generator, ?DEFAULT_OPTIONS).
+
+decode_fold({maker, FolderMaker}, AccIn,
+            {Generator, GeneratorState}, Options) ->
     {arity, Arity} = erlang:fun_info(FolderMaker, arity),
     State = #state{generator = Generator,
-                   generator_state = GeneratorState},
+                   generator_state = GeneratorState,
+                   options = Options},
     case decode_n_rows(State, Arity) of
         not_enough_rows ->
             AccIn;
@@ -24,22 +37,32 @@ decode_fold({maker, FolderMaker}, AccIn, {Generator, GeneratorState}) ->
             ok = csv_parser:set_capture(NewState#state.parser, Capture),
             decode_fold1(Folder, AccIn, NewState)
     end;
-decode_fold(Folder, AccIn, {Generator, GeneratorState}) ->
+decode_fold(Folder, AccIn, {Generator, GeneratorState}, Options) ->
     State = #state{generator = Generator,
-                   generator_state = GeneratorState},
+                   generator_state = GeneratorState,
+                   options = Options},
     decode_fold1(Folder, AccIn, State).
 
-decode_binary_fold(Folder, AccIn, Csv) when is_binary(Csv) ->
+decode_binary_fold(Folder, AccIn, Csv) ->
+    decode_binary_fold(Folder, AccIn, Csv, ?DEFAULT_OPTIONS).
+
+decode_binary_fold(Folder, AccIn, Csv, Options) when is_binary(Csv) ->
     Generator = fun(init_state) ->
                         {Csv, done}
                 end,
-    decode_fold(Folder, AccIn, {Generator, init_state}).
+    decode_fold(Folder, AccIn, {Generator, init_state}, Options).
 
-decode_binary(Csv) when is_binary(Csv) ->
+decode_binary(Csv) ->
+    decode_binary(Csv, ?DEFAULT_OPTIONS).
+
+decode_binary(Csv, Options) when is_binary(Csv) ->
     Folder = fun(Row, Acc) -> [Row | Acc] end,
-    lists:reverse(decode_binary_fold(Folder, [], Csv)).
+    lists:reverse(decode_binary_fold(Folder, [], Csv, Options)).
 
-decode_gzip_fold(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
+decode_gzip_fold(Folder, AccIn, CsvGzip) ->
+    decode_gzip_fold(Folder, AccIn, CsvGzip, ?DEFAULT_OPTIONS).
+
+decode_gzip_fold(Folder, AccIn, CsvGzip, Options) when is_binary(CsvGzip) ->
     Z = zlib:open(),
     ok = zlib:inflateInit(Z, ?GZIP_HEADER_SIZE),
     Generator =
@@ -54,7 +77,7 @@ decode_gzip_fold(Folder, AccIn, CsvGzip) when is_binary(CsvGzip) ->
                         {iolist_to_binary(IoList), GzipRest}
                 end
         end,
-    decode_fold(Folder, AccIn, {Generator, CsvGzip}).
+    decode_fold(Folder, AccIn, {Generator, CsvGzip}, Options).
 
 %% Internal
 
@@ -73,9 +96,8 @@ decode_n_rows(State, N, Acc) ->
 
 parse(_, #state{parser = closed}) ->
     done;
-parse(ParseFun, #state{parser = undefined} = State) ->
-    {ok, Parser} = csv_parser:init(),
-    NewState = State#state{parser = Parser,
+parse(ParseFun, #state{parser = undefined, options = Options} = State) ->
+    NewState = State#state{parser = init_parser(Options),
                            parser_state = eob},
     parse(ParseFun, NewState);
 parse(_, #state{generator_state = done,
@@ -92,6 +114,15 @@ parse(ParseFun, State) ->
         {ok, Rows} ->
             {Rows, State}
     end.
+
+init_parser(Options) ->
+    {ok, Parser} = csv_parser:init(parser_options(Options)),
+    Parser.
+
+parser_options([{delimiter, comma}]) ->
+    ?OPTION_COMMA_DELIMITED;
+parser_options([{delimiter, tab}]) ->
+    ?OPTION_TAB_DELIMITED.
 
 decode_fold1(Folder, Acc, State) ->
     case parse(fun csv_parser:parse/1, State) of
