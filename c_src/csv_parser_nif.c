@@ -4,6 +4,7 @@
 #include "../deps/libcsv/csv.h"
 
 #define OPTION_DELIM_TABS 1
+#define OPTION_RETURN_BINARY 2
 
 typedef int bool;
 #define true 1
@@ -47,6 +48,7 @@ struct state {
   struct row_buffer row_buffer;
   struct csv_buffer csv_buffer;
   struct capture capture;
+  unsigned options;
 };
 
 struct callback_state {
@@ -54,6 +56,7 @@ struct callback_state {
   struct row_buffer *row_buffer_ptr;
   struct capture *capture_ptr;
   ErlNifEnv* env_ptr;
+  unsigned options;
 };
 
 struct csv_chunk {
@@ -145,6 +148,29 @@ static void add_cell(void *data_ptr, int size,
   row_buffer_ptr->cols_used++;
 }
 
+ERL_NIF_TERM make_output_binary(ErlNifEnv* env_ptr, char *data_ptr, int size)
+{
+  ERL_NIF_TERM out_term;
+  unsigned char *out_term_data_ptr;
+
+  out_term_data_ptr = enif_make_new_binary(env_ptr, size, &out_term);
+  memcpy(out_term_data_ptr, data_ptr, size);
+  return out_term;
+}
+
+ERL_NIF_TERM make_output_term(ErlNifEnv* env_ptr, char *data_ptr,
+                              int size, unsigned options)
+{
+  if (options & OPTION_RETURN_BINARY) {
+    return make_output_binary(env_ptr, data_ptr, size);
+  } else {
+    return enif_make_string_len(env_ptr,
+                                data_ptr,
+                                size,
+                                ERL_NIF_LATIN1);
+  }
+}
+
 static int make_output_terms(struct callback_state* cb_state_ptr,
                              ERL_NIF_TERM *out_terms_ptr)
 {
@@ -158,19 +184,19 @@ static int make_output_terms(struct callback_state* cb_state_ptr,
   if (capture_ptr->indexes_ptr == NULL) {
     for (out_i = 0; out_i < cols_used; out_i++) {
       out_terms_ptr[out_i] =
-        enif_make_string_len(env_ptr,
-                             row_buffer_ptr->cells_ptr[out_i].data_ptr,
-                             row_buffer_ptr->cells_ptr[out_i].data_size,
-                             ERL_NIF_LATIN1);
+        make_output_term(env_ptr,
+                         row_buffer_ptr->cells_ptr[out_i].data_ptr,
+                         row_buffer_ptr->cells_ptr[out_i].data_size,
+                         cb_state_ptr->options);
     }
   } else {
     for (out_i = 0; out_i < capture_ptr->size; out_i++) {
       capture_i = capture_ptr->indexes_ptr[out_i];
       out_terms_ptr[out_i] =
-        enif_make_string_len(env_ptr,
-                             row_buffer_ptr->cells_ptr[capture_i].data_ptr,
-                             row_buffer_ptr->cells_ptr[capture_i].data_size,
-                             ERL_NIF_LATIN1);
+        make_output_term(env_ptr,
+                         row_buffer_ptr->cells_ptr[capture_i].data_ptr,
+                         row_buffer_ptr->cells_ptr[capture_i].data_size,
+                         cb_state_ptr->options);
     }
   }
   return out_i;
@@ -234,11 +260,12 @@ static void init_capture(struct capture *capture_ptr) {
   capture_ptr->indexes_ptr = NULL;
 }
 
-static struct state* init_state()
+static struct state* init_state(unsigned options)
 {
   struct state* state_ptr = enif_alloc_resource(state_type,
                                                 sizeof(struct state));
   if (state_ptr != NULL) {
+    state_ptr->options = options;
     init_row_buffer(&state_ptr->row_buffer);
     init_csv_buffer(&state_ptr->csv_buffer);
     init_capture(&state_ptr->capture);
@@ -301,6 +328,7 @@ static void init_callback_state(struct callback_state *cb_state_ptr,
   cb_state_ptr->out_buffer.row_n = 0;
   cb_state_ptr->row_buffer_ptr = &(state_ptr->row_buffer);
   cb_state_ptr->capture_ptr = &(state_ptr->capture);
+  cb_state_ptr->options = state_ptr->options;
 }
 
 static bool is_csv_buffer_empty(struct csv_buffer *csv_buffer_ptr)
@@ -392,7 +420,7 @@ static ERL_NIF_TERM init(ErlNifEnv* env_ptr, int argc,
     return enif_make_badarg(env_ptr);
   }
 
-  state_ptr = init_state();
+  state_ptr = init_state(options);
   if (state_ptr == NULL) {
     return error(env_ptr, "init_state failed");
   }
