@@ -8,10 +8,14 @@
          decode_gzip_fold/3,
          decode_gzip_fold/4]).
 
+-define(DEFAULT_OPTIONS, [{delimiter, comma},
+                          {return, list}]).
+
 -define(GZIP_HEADER_SIZE, 31).
--define(OPTION_COMMA_DELIMITED, 0).
 -define(OPTION_TAB_DELIMITED, 1).
--define(DEFAULT_OPTIONS, [{delimiter, comma}]).
+-define(OPTION_COMMA_DELIMITED, 0).
+-define(OPTION_RETURN_BINARY, 2).
+-define(OPTION_RETURN_LIST, 0).
 
 -record(state,
         {parser          :: term(),
@@ -119,10 +123,20 @@ init_parser(Options) ->
     {ok, Parser} = csv_parser:init(parser_options(Options)),
     Parser.
 
-parser_options([{delimiter, comma}]) ->
+parser_options(Options) ->
+    Folder = fun(Option, Acc) ->
+                     Acc + parser_option(Option)
+             end,
+    lists:foldl(Folder, 0, Options).
+
+parser_option({delimiter, comma}) ->
     ?OPTION_COMMA_DELIMITED;
-parser_options([{delimiter, tab}]) ->
-    ?OPTION_TAB_DELIMITED.
+parser_option({delimiter, tab}) ->
+    ?OPTION_TAB_DELIMITED;
+parser_option({return, binary}) ->
+    ?OPTION_RETURN_BINARY;
+parser_option({return, list}) ->
+    ?OPTION_RETURN_LIST.
 
 decode_fold1(Folder, Acc, State) ->
     case parse(fun csv_parser:parse/1, State) of
