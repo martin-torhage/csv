@@ -3,6 +3,8 @@
 #include "erl_nif.h"
 #include "../deps/libcsv/csv.h"
 
+#define OPTION_DELIM_TABS 1
+
 typedef int bool;
 #define true 1
 #define false 0
@@ -364,12 +366,31 @@ static ERL_NIF_TERM error2(ErlNifEnv* env_ptr, const char* reason1,
                                                        ERL_NIF_LATIN1)));
 }
 
+void set_delimiter(struct csv_parser *parser_ptr, unsigned options) {
+  unsigned char delimiter;
+
+  if (options & OPTION_DELIM_TABS) {
+    delimiter = CSV_TAB;
+  } else {
+    delimiter = CSV_COMMA;
+  }
+  csv_set_delim(parser_ptr, delimiter);
+}
+
 static ERL_NIF_TERM init(ErlNifEnv* env_ptr, int argc,
                          const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM resource;
   struct state* state_ptr;
   struct csv_parser *parser_ptr;
+  unsigned options;
+
+  if (argc != 1) {
+    return enif_make_badarg(env_ptr);
+  }
+  if (!enif_get_uint(env_ptr, argv[0], &options)) {
+    return enif_make_badarg(env_ptr);
+  }
 
   state_ptr = init_state();
   if (state_ptr == NULL) {
@@ -379,6 +400,8 @@ static ERL_NIF_TERM init(ErlNifEnv* env_ptr, int argc,
   if (csv_init(parser_ptr, 0) != 0) {
     return error(env_ptr, "csv_init failed");
   }
+  set_delimiter(parser_ptr, options);
+
   resource = enif_make_resource(env_ptr, state_ptr);
   enif_release_resource(state_ptr);
   return ok_tuple(env_ptr, resource);
@@ -532,7 +555,7 @@ static ERL_NIF_TERM parse(ErlNifEnv* env_ptr, int argc,
 
 static ErlNifFunc nif_funcs[] =
   {
-    {"init", 0, init},
+    {"init", 1, init},
     {"close", 1, close},
     {"feed", 2, feed},
     {"set_capture", 2, set_capture},
