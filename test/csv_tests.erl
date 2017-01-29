@@ -8,6 +8,8 @@ csv_test_() ->
      fun teardown/1,
      [{"Should decode binary",
        ?_test(decode_binary())},
+      {"Should decode tab separated",
+       ?_test(decode_tabbed_binary())},
       {"Should decode only selected columns",
        ?_test(decode_selected_columns())}]}.
 
@@ -21,10 +23,15 @@ decode_binary() ->
     Csv = <<"col1,col2,\"col with a \"\"\",col4\nonly column in row 2">>,
     Expected = [["col1", "col2", "col with a \"", "col4"],
                 ["only column in row 2"]],
-    Folder = fun(Row, Acc) ->
-                     [Row | Acc]
-             end,
-    Actual = lists:reverse(csv:decode_binary_fold(Folder, [], Csv)),
+    Actual = csv:decode_binary(Csv),
+    ?assertEqual(Expected, Actual).
+
+decode_tabbed_binary() ->
+    Csv = <<"col1\tcol2\tcol3\rv1\t\"v2\"\tv,a,l,u,e,3">>,
+    Expected = [["col1", "col2", "col3"],
+                ["v1", "v2", "v,a,l,u,e,3"]],
+    Options = [{delimiter, tab}],
+    Actual = csv:decode_binary(Csv, Options),
     ?assertEqual(Expected, Actual).
 
 decode_selected_columns() ->
