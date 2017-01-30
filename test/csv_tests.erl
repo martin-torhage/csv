@@ -14,8 +14,8 @@ csv_test_() ->
        ?_test(decode_tabbed_binary())},
       {"Should decode only selected columns",
        ?_test(decode_selected_columns())},
-      {"Should decode small batches",
-       ?_test(decode_small_batches())}]}.
+      {"Should decode small chunks",
+       ?_test(decode_small_chunks())}]}.
 
 setup() ->
     ok.
@@ -66,7 +66,7 @@ decode_selected_columns() ->
                csv:decode_binary_fold({maker, FolderMaker}, [], Csv)),
     ?assertEqual(Expected, Actual).
 
-decode_small_batches() ->
+decode_small_chunks() ->
     Data = generate_data(6, 1000),
     Decoded = csv:decode_fold(fun(Row, Acc) -> [Row | Acc] end,
                               [],
