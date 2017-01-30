@@ -99,9 +99,5 @@ encode_csv_row([Col | Rest], Acc) ->
 chunk_generator(<<>>) ->
     {<<>>, done};
 chunk_generator(Csv) ->
-    csv_binary:split_by_size(Csv, random_chunk_size()).
-
-random_chunk_size() ->
-    ChunkSizes = [0, 1, 2, 3, 7],
-    lists:nth(rand:uniform(length(ChunkSizes)),
-              ChunkSizes).
+    ChunkSize = rand:uniform(8) - 1,
+    csv_binary:split_by_size(Csv, ChunkSize).
