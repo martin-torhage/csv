@@ -48,7 +48,8 @@ decode_gzip_fold(Folder, AccIn, CsvGzip, Options) when is_binary(CsvGzip) ->
     ok = zlib:inflateInit(Z, ?GZIP_HEADER_SIZE),
     Generator =
         fun(Gzip) ->
-                {GzipHead, GzipRest} = binary_split_by_size(Gzip, 16 * 1024),
+                {GzipHead, GzipRest} =
+                    csv_binary:split_by_size(Gzip, 16 * 1024),
                 case zlib:inflate(Z, GzipHead) of
                     [] when GzipRest =:= <<>> ->
                         ok = zlib:inflateEnd(Z),
@@ -84,15 +85,6 @@ decode_fold(Folder, AccIn, {Generator, GeneratorState}, Options) ->
     decode_fold1(Folder, AccIn, State).
 
 %% Internal
-
-binary_split_by_size(Bin, Size) ->
-    case Size >= byte_size(Bin) of
-        true ->
-            {Bin, <<>>};
-        false ->
-            {binary:part(Bin, 0, Size),
-             binary:part(Bin, Size, byte_size(Bin) - Size)}
-    end.
 
 decode_n_rows(State, N) ->
     decode_n_rows(State, N, []).
