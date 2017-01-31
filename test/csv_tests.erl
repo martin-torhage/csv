@@ -13,15 +13,15 @@ csv_test_() ->
       {"Should decode tab separated",
        ?_test(decode_tabbed_binary())},
       {"Should decode only selected columns",
-       ?_test(decode_selected_columns())},
-      {"Should decode small chunks",
-       ?_test(decode_small_chunks())}]}.
+       ?_test(decode_selected_columns())}]}.
 
 setup() ->
     ok.
 
 teardown(ok) ->
     ok.
+
+%% Tests
 
 decode_binary() ->
     Csv = <<"col1,col2,\"col with a \"\"\",col4\n"
@@ -50,29 +50,24 @@ decode_tabbed_binary() ->
     ?assertEqual(Expected, Actual).
 
 decode_selected_columns() ->
-    Csv = <<"h1v1,h1v2,h1v3\n"
-            "h2v1,h2v2,h2v3\n"
-            "r1v1,r1v2,r1v3\n",
-            "r2v1,r2v2,r2v3">>,
-    Expected = [["r1v3", "r1v3", "r1v1"],
-                ["r2v3", "r2v3", "r2v1"]],
-    FolderMaker = fun(Header1, Header2) ->
-                          ?assertEqual(["h1v1", "h1v2", "h1v3"], Header1),
-                          ?assertEqual(["h2v1", "h2v2", "h2v3"], Header2),
-                          {fun (Row, Acc) -> [Row | Acc] end,
-                           [2, 2, 0]}
-                  end,
-    Actual = lists:reverse(
-               csv:decode_binary_fold({maker, FolderMaker}, [], Csv)),
-    ?assertEqual(Expected, Actual).
-
-decode_small_chunks() ->
-    Data = generate_data(6, 1000),
-    Decoded = csv:decode_fold(fun(Row, Acc) -> [Row | Acc] end,
+    Data = generate_data(3, 1000),
+    ColumnCapture = [2, 2, 1],
+    FolderMaker =
+        fun(Header1, Header2) ->
+                ?assertEqual([<<"r1c1">>, <<"r1c2">>, <<"r1c3">>], Header1),
+                ?assertEqual([<<"r2c1">>, <<"r2c2">>, <<"r2c3">>], Header2),
+                {fun (Row, Acc) -> [Row | Acc] end,
+                 ColumnCapture}
+        end,
+    Decoded = csv:decode_fold({maker, FolderMaker},
                               [],
                               {fun chunk_generator/1, encode_csv(Data)},
                               [{return, binary}]),
-    ?assertEqual(Data, lists:reverse(Decoded)).
+    [_, _ | DataBody] = Data,
+    Expected = pluck(ColumnCapture, DataBody),
+    ?assertEqual(Expected, lists:reverse(Decoded)).
+
+%% Utilities
 
 generate_data(Cols, Rows) ->
     [generate_row(RowI, Cols) || RowI <- lists:seq(1, Rows)].
@@ -101,3 +96,13 @@ chunk_generator(<<>>) ->
 chunk_generator(Csv) ->
     ChunkSize = rand:uniform(8) - 1,
     csv_binary:split_by_size(Csv, ChunkSize).
+
+pluck(Columns, Rows) ->
+    pluck(Columns, Rows, []).
+
+pluck(_, [], Acc) ->
+    lists:reverse(Acc);
+pluck(Columns, [Row | Rest], Acc) ->
+    Plucked = [lists:nth(ColI + 1, Row) || ColI <- Columns],
+    NewAcc = [Plucked | Acc],
+    pluck(Columns, Rest, NewAcc).
