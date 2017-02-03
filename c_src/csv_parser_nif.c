@@ -470,6 +470,9 @@ static ERL_NIF_TERM feed(ErlNifEnv* env_ptr, int argc,
   if (is_csv_buffer_empty(csv_buffer_ptr) == false) {
     return error(env_ptr, "csv buffer not empty");
   } else {
+    if (csv_buffer_ptr->data_ptr != NULL) {
+      enif_free(csv_buffer_ptr->data_ptr);
+    }
     csv_buffer_ptr->data_ptr = enif_alloc(csv_bin.size);
     if (csv_buffer_ptr->data_ptr == NULL) {
       return error(env_ptr, "could not allocate csv buffer");
