@@ -1,4 +1,5 @@
 #include <string.h>
+#include <math.h>
 #include "erl_nif.h"
 #include "../deps/libcsv/csv.h"
 
@@ -65,15 +66,20 @@ struct csv_chunk {
 
 ErlNifResourceType* state_type;
 
+static size_t align_cell_size(size_t size)
+{
+  return ceil(size / 16.0) * 16;
+}
+
 static void ensure_cell_size(struct cell *cell_ptr, size_t size)
 {
   size_t new_size;
 
   if (cell_ptr->data_ptr == NULL || cell_ptr->allocated_size < size) {
-    new_size = ((size + 100) / 100) * 100; // Correcto?
     if (cell_ptr->data_ptr != NULL) {
       enif_free(cell_ptr->data_ptr);
     }
+    new_size = align_cell_size(size);
     cell_ptr->data_ptr = enif_alloc(new_size);
     cell_ptr->allocated_size = new_size;
   }
