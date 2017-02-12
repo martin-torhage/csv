@@ -1,5 +1,6 @@
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 #include "erl_nif.h"
 #include "../deps/libcsv/csv.h"
 
@@ -11,7 +12,11 @@ typedef int bool;
 #define false 0
 
 #define MAX_PARSE_SIZE 16
-#define MAX_ROWS_PER_BATCH MAX_PARSE_SIZE + 1
+// Empty lines are filtered out by libcsv (default behaviour). Each
+// line consists therefor of at least 2 bytes (one character plus one
+// new-line) except for the last line which doesn't need to end with
+// new-line.
+#define MAX_ROWS_PER_BATCH 8
 
 #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 
@@ -210,13 +215,12 @@ static void add_row(struct callback_state* cb_state_ptr)
   ERL_NIF_TERM out_cells[row_buffer_ptr->cols_used];
   unsigned out_cells_used;
 
-  if (out_buffer_ptr->row_n < MAX_ROWS_PER_BATCH) {
-    out_cells_used = make_output_terms(cb_state_ptr, out_cells);
-    row_buffer_ptr->cols_used = 0;
-    out_buffer_ptr->rows[out_buffer_ptr->row_n] =
-      enif_make_list_from_array(env_ptr, out_cells, out_cells_used);
-    out_buffer_ptr->row_n++;
-  }
+  assert(out_buffer_ptr->row_n < MAX_ROWS_PER_BATCH);
+  out_cells_used = make_output_terms(cb_state_ptr, out_cells);
+  row_buffer_ptr->cols_used = 0;
+  out_buffer_ptr->rows[out_buffer_ptr->row_n] =
+    enif_make_list_from_array(env_ptr, out_cells, out_cells_used);
+  out_buffer_ptr->row_n++;
 }
 
 static void column_callback (void *data_ptr, size_t size,
