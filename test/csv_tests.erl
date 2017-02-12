@@ -13,7 +13,9 @@ csv_test_() ->
       {"Should decode tab separated",
        ?_test(decode_tabbed_binary())},
       {"Should decode only selected columns",
-       ?_test(decode_selected_columns())}]}.
+       ?_test(decode_selected_columns())},
+      {"Should decode only commas chars",
+       ?_test(decode_commas_only())}]}.
 
 setup() ->
     ok.
@@ -67,6 +69,13 @@ decode_selected_columns() ->
     Expected = pluck(ColumnCapture, DataBody),
     ?assertEqual(Expected, lists:reverse(Decoded)).
 
+%% Decode a CSV of an extreme amout of columns per kB.
+decode_commas_only() ->
+    Csv = repeat(<<",">>, 5000),
+    Expected = [lists:duplicate(5001, "")],
+    ?assertEqual(Expected, csv:decode_binary(Csv)).
+    ?assertEqual(Expected, csv:decode_binary(Csv)).
+
 %% Utilities
 
 generate_data(Cols, Rows) ->
@@ -106,3 +115,6 @@ pluck(Columns, [Row | Rest], Acc) ->
     Plucked = [lists:nth(ColI + 1, Row) || ColI <- Columns],
     NewAcc = [Plucked | Acc],
     pluck(Columns, Rest, NewAcc).
+
+repeat(Bin, N) ->
+    iolist_to_binary(lists:duplicate(N, Bin)).
