@@ -15,7 +15,9 @@ csv_test_() ->
       {"Should decode only selected columns",
        ?_test(decode_selected_columns())},
       {"Should decode only commas chars",
-       ?_test(decode_commas_only())}]}.
+       ?_test(decode_commas_only())},
+      {"Should decode max amount of rows",
+       ?_test(decode_max_rows())}]}.
 
 setup() ->
     ok.
@@ -74,6 +76,12 @@ decode_commas_only() ->
     Csv = repeat(<<",">>, 5000),
     Expected = [lists:duplicate(5001, "")],
     ?assertEqual(Expected, csv:decode_binary(Csv)).
+
+%% Decode a CSV of an extrem amount of rows per kB. Empty lines are
+%% stripped by libcsv since it's not runnning in strict mode.
+decode_max_rows() ->
+    Csv = repeat(<<"a\n">>, 5000),
+    Expected = lists:duplicate(5000, ["a"]),
     ?assertEqual(Expected, csv:decode_binary(Csv)).
 
 %% Utilities
