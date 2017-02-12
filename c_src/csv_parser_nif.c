@@ -11,12 +11,12 @@ typedef int bool;
 #define true 1
 #define false 0
 
-#define MAX_PARSE_SIZE 16
+#define MAX_PARSE_SIZE 128
 // Empty lines are filtered out by libcsv (default behaviour). Each
 // line consists therefor of at least 2 bytes (one character plus one
 // new-line) except for the last line which doesn't need to end with
 // new-line.
-#define MAX_ROWS_PER_BATCH 8
+#define MAX_ROWS_PER_BATCH 64
 
 #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 
