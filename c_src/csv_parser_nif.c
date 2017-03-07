@@ -43,6 +43,8 @@ struct csv_buffer {
   size_t consumed;
 };
 
+// The capture index is zero-based here while it's 1-indexed in the
+// Erlang code.
 struct capture {
   unsigned *indexes_ptr;
   unsigned size;
