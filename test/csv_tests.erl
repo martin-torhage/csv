@@ -14,6 +14,8 @@ csv_test_() ->
        ?_test(decode_tabbed_binary())},
       {"Should decode only selected columns",
        ?_test(decode_selected_columns())},
+      {"Should handle out of bounds capture",
+       ?_test(decode_out_of_bounds_capture())},
       {"Should decode only commas chars",
        ?_test(decode_commas_only())},
       {"Should decode max amount of rows",
@@ -70,6 +72,23 @@ decode_selected_columns() ->
     [_, _ | DataBody] = Data,
     Expected = pluck(ColumnCapture, DataBody),
     ?assertEqual(Expected, lists:reverse(Decoded)).
+
+decode_out_of_bounds_capture() ->
+    Csv = <<"h1,h2,h3\nv1,v2,v3\nv11,v22,v33">>,
+    ColumnCapture = [4, 2, 2, 5, 10000],
+    FolderMaker =
+        fun(["h1", "h2", "h3"]) ->
+                {fun (Row, Acc) -> [Row | Acc] end,
+                 ColumnCapture}
+        end,
+    Decoded = lists:reverse(csv:decode_fold({maker, FolderMaker},
+                                            [],
+                                            {fun chunk_generator/1, Csv},
+                                            [{return, list}])),
+    Expected = [["", "v2", "v2", "", ""],
+                ["", "v22", "v22", "", ""]],
+    ?assertEqual(Expected, Decoded).
+
 
 %% Decode a CSV of an extreme amout of columns per kB.
 decode_commas_only() ->
