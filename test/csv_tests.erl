@@ -57,7 +57,7 @@ decode_tabbed_binary() ->
 
 decode_selected_columns() ->
     Data = generate_data(3, 1000),
-    ColumnCapture = [2, 2, 1],
+    ColumnCapture = [3, 3, 2],
     FolderMaker =
         fun(Header1, Header2) ->
                 ?assertEqual([<<"r1c1">>, <<"r1c2">>, <<"r1c3">>], Header1),
@@ -139,7 +139,7 @@ pluck(Columns, Rows) ->
 pluck(_, [], Acc) ->
     lists:reverse(Acc);
 pluck(Columns, [Row | Rest], Acc) ->
-    Plucked = [lists:nth(ColI + 1, Row) || ColI <- Columns],
+    Plucked = [lists:nth(ColI, Row) || ColI <- Columns],
     NewAcc = [Plucked | Acc],
     pluck(Columns, Rest, NewAcc).
 
