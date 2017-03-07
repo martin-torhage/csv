@@ -197,30 +197,57 @@ static unsigned make_output_terms(struct callback_state* cb_state_ptr,
   } else {
     for (out_i = 0; out_i < capture_ptr->size; out_i++) {
       capture_i = capture_ptr->indexes_ptr[out_i];
-      out_terms_ptr[out_i] =
-        make_output_term(env_ptr,
-                         row_buffer_ptr->cells_ptr[capture_i].data_ptr,
-                         row_buffer_ptr->cells_ptr[capture_i].data_size,
-                         cb_state_ptr->options);
+      if (capture_i >= row_buffer_ptr->cols_used) {
+        out_terms_ptr[out_i] =
+          make_output_term(env_ptr,
+                           NULL,
+                           0,
+                           cb_state_ptr->options);
+      } else {
+        out_terms_ptr[out_i] =
+          make_output_term(env_ptr,
+                           row_buffer_ptr->cells_ptr[capture_i].data_ptr,
+                           row_buffer_ptr->cells_ptr[capture_i].data_size,
+                           cb_state_ptr->options);
+      }
     }
   }
   return out_i;
+}
+
+static unsigned output_row_length(struct callback_state* cb_state_ptr)
+{
+  struct capture *capture_ptr = cb_state_ptr->capture_ptr;
+
+  if (capture_ptr->indexes_ptr != NULL) {
+    return capture_ptr->size;
+  } else {
+    return cb_state_ptr->row_buffer_ptr->cols_used;
+  }
 }
 
 static void add_row(struct callback_state* cb_state_ptr)
 {
   struct out_buffer *out_buffer_ptr = &(cb_state_ptr->out_buffer);
   struct row_buffer *row_buffer_ptr = cb_state_ptr->row_buffer_ptr;
+  unsigned row_length;
   ErlNifEnv* env_ptr = cb_state_ptr->env_ptr;
-  ERL_NIF_TERM out_cells[row_buffer_ptr->cols_used];
+  ERL_NIF_TERM *out_cells_ptr;
   unsigned out_cells_used;
 
   assert(out_buffer_ptr->row_n < MAX_ROWS_PER_BATCH);
-  out_cells_used = make_output_terms(cb_state_ptr, out_cells);
+
+  row_length = output_row_length(cb_state_ptr);
+  out_cells_ptr = enif_alloc(row_length * sizeof(ERL_NIF_TERM));
+
+  out_cells_used = make_output_terms(cb_state_ptr, out_cells_ptr);
+  assert(out_cells_used == row_length);
   row_buffer_ptr->cols_used = 0;
   out_buffer_ptr->rows[out_buffer_ptr->row_n] =
-    enif_make_list_from_array(env_ptr, out_cells, out_cells_used);
+    enif_make_list_from_array(env_ptr, out_cells_ptr, out_cells_used);
   out_buffer_ptr->row_n++;
+
+  enif_free(out_cells_ptr);
 }
 
 static void column_callback (void *data_ptr, size_t size,
