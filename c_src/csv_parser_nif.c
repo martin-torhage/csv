@@ -199,17 +199,17 @@ static unsigned make_output_terms(struct callback_state* cb_state_ptr,
   } else {
     for (out_i = 0; out_i < capture_ptr->size; out_i++) {
       capture_i = capture_ptr->indexes_ptr[out_i];
-      if (capture_i >= row_buffer_ptr->cols_used) {
-        out_terms_ptr[out_i] =
-          make_output_term(env_ptr,
-                           NULL,
-                           0,
-                           cb_state_ptr->options);
-      } else {
+      if (capture_i < row_buffer_ptr->cols_used) {
         out_terms_ptr[out_i] =
           make_output_term(env_ptr,
                            row_buffer_ptr->cells_ptr[capture_i].data_ptr,
                            row_buffer_ptr->cells_ptr[capture_i].data_size,
+                           cb_state_ptr->options);
+      } else {
+        out_terms_ptr[out_i] =
+          make_output_term(env_ptr,
+                           NULL,
+                           0,
                            cb_state_ptr->options);
       }
     }
