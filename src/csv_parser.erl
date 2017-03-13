@@ -1,17 +1,29 @@
 -module(csv_parser).
 -on_load(init_nif/0).
 
--export([init/0,
+-export([init/1,
          close/1,
-         parse/2]).
+         feed/2,
+         set_capture/2,
+         parse_one_row/1,
+         parse/1]).
 
-init() ->
+init(_) ->
     erlang:nif_error(nif_not_loaded).
 
 close(_) ->
     erlang:nif_error(nif_not_loaded).
 
-parse(_, _) ->
+feed(_, _) ->
+    erlang:nif_error(nif_not_loaded).
+
+set_capture(_, _) ->
+    erlang:nif_error(nif_not_loaded).
+
+parse_one_row(_) ->
+    erlang:nif_error(nif_not_loaded).
+
+parse(_) ->
     erlang:nif_error(nif_not_loaded).
 
 %% Internal
