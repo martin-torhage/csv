@@ -19,7 +19,7 @@
 
 -record(state,
         {parser          :: term(),
-         parser_state    :: has_csv | eob,
+         parser_state    :: has_csv | eob | undefined,
          generator       :: fun(),
          generator_state :: term(),
          options         :: list()}).
