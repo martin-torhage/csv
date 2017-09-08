@@ -76,8 +76,12 @@ decode_fold({maker, FolderMaker}, AccIn,
         {Rows, NewState} ->
             {Folder, Capture} = erlang:apply(FolderMaker, Rows),
             CaptureZeroBased = [Index - 1 || Index <- Capture],
-            ok = csv_parser:set_capture(NewState#state.parser,
-                                        CaptureZeroBased),
+            case NewState#state.parser of
+                closed ->
+                    ok;
+                Parser ->
+                    ok = csv_parser:set_capture(Parser, CaptureZeroBased)
+            end,
             decode_fold1(Folder, AccIn, NewState)
     end;
 decode_fold(Folder, AccIn, {Generator, GeneratorState}, Options) ->
