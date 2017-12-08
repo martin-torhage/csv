@@ -2,6 +2,8 @@ ebin
 .rebar
 .eunit
 c_src/*.o
+c_src/*.d
 priv/*.so
 deps/libcsv/
 rebar.lock
+_build
