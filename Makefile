@@ -5,7 +5,7 @@ ERL ?= erl
 REBAR=./rebar3
 LOCAL_DEPS=deps
 
-.PHONY: nif get-deps compile test
+.PHONY: nif get-deps compile test clean
 
 nif: get-deps compile
 
@@ -26,3 +26,6 @@ compile: get-deps
 
 test: compile
 	@${REBAR} eunit skip_deps=true
+
+clean:
+	@${REBAR} clean --all
