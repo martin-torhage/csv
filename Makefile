@@ -7,6 +7,8 @@ LOCAL_DEPS=deps
 
 .PHONY: upgrade compile test clean
 
+all: compile
+
 # Since rebar is using a single deps directory, inhereted by the top
 # rebar.config, the relative path to the deps will vary. Building the
 # C code requires a static relative path to libcsv, so we fetch libcsv
