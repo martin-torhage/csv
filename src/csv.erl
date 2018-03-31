@@ -95,6 +95,8 @@ decode_n_rows(State, N, Acc) ->
     case parse(fun csv_parser:parse_one_row/1, State) of
         done ->
             not_enough_rows;
+        {[], _} ->
+            not_enough_rows;
         {[Row], NewState}->
             decode_n_rows(NewState, N - 1, [Row | Acc])
     end.

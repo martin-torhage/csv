@@ -3,7 +3,7 @@
  csv,
  [{description,
    "CSV parser using libcsv in NIF"},
-  {vsn, "3.0.0"},
+  {vsn, "3.0.1"},
   {modules, []},
   {registered, []},
   {applications, [kernel,

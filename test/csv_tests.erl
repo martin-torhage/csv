@@ -87,7 +87,7 @@ decode_selected_columns_empty_csv() ->
                      Actual = csv:decode_binary_fold(Folder, Expected, Csv),
                      ?assertEqual(Expected, Actual)
              end,
-    Csvs = [<<"a,b">>, <<"a,b\naa,bb">>],
+    Csvs = [<<>>, <<"a,b">>, <<"a,b\naa,bb">>],
     lists:foreach(Assert, Csvs).
 
 decode_out_of_bounds_capture() ->
