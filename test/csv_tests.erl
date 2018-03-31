@@ -14,6 +14,8 @@ csv_test_() ->
        ?_test(decode_tabbed_binary())},
       {"Should decode only selected columns",
        ?_test(decode_selected_columns())},
+      {"Should decode only selected columns, empty body",
+       ?_test(decode_selected_columns_empty_csv())},
       {"Should handle out of bounds capture",
        ?_test(decode_out_of_bounds_capture())},
       {"Should decode only commas chars",
@@ -72,6 +74,21 @@ decode_selected_columns() ->
     [_, _ | DataBody] = Data,
     Expected = pluck(ColumnCapture, DataBody),
     ?assertEqual(Expected, lists:reverse(Decoded)).
+
+
+decode_selected_columns_empty_csv() ->
+    ColumnCapture = [1],
+    Folder = {maker, fun(_, _) ->
+                             {fun (Row, Acc) -> [Row | Acc] end,
+                              ColumnCapture}
+                     end},
+    Assert = fun (Csv) ->
+                     Expected = [dummy],
+                     Actual = csv:decode_binary_fold(Folder, Expected, Csv),
+                     ?assertEqual(Expected, Actual)
+             end,
+    Csvs = [<<"a,b">>, <<"a,b\naa,bb">>],
+    lists:foreach(Assert, Csvs).
 
 decode_out_of_bounds_capture() ->
     Csv = <<"h1,h2,h3\nv1,v2,v3\nv11,v22,v33">>,
