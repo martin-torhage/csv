@@ -1,13 +1,22 @@
 %% -*-erlang-*-
 {application,
  csv,
- [{description,
-   "CSV parser using libcsv in NIF"},
+ [{description, "Erlang CSV parser with NIF using libcsv"},
   {vsn, "2.0.4"},
   {modules, []},
   {registered, []},
   {applications, [kernel,
-                  stdlib
-                 ]},
-  {env, []}
+                  stdlib]},
+  {env, []},
+  {pkg_name, "csve"},
+  {maintainers, ["Martin Torhage"]},
+  {licenses, ["MIT"]},
+  {links, [{"GitHub", "https://github.com/martin-torhage/csv"}]},
+  {files, ["LICENSE",
+           "Makefile",
+           "README.md",
+           "c_src",
+           "rebar.config",
+           "src",
+           "test"]}
  ]}.
