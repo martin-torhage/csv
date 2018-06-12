@@ -2,7 +2,7 @@
 #include <math.h>
 #include <assert.h>
 #include "erl_nif.h"
-#include "../deps/libcsv/csv.h"
+#include "libcsv/csv.h"
 
 #define OPTION_DELIM_TABS 1
 #define OPTION_RETURN_BINARY 2
