@@ -4,7 +4,7 @@ defmodule Postgrex.MixProject do
   def project() do
     [
       app: :csv,
-      version: "3.0.2",
+      version: "3.0.3",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       description: "Erlang CSV parser implemented with NIF",
