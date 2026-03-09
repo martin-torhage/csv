@@ -2,7 +2,7 @@
 {application,
  csv,
  [{description,
-   "CSV parser using libcsv in NIF"},
+   "Fast NIF-based CSV parser using libcsv"},
   {vsn, "3.0.3"},
   {modules, []},
   {registered, []},
