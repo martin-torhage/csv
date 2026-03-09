@@ -9,5 +9,6 @@
   {applications, [kernel,
                   stdlib
                  ]},
-  {env, []}
+  {env, []},
+  {licenses, ["MIT", "LGPL-2.1-only"]}
  ]}.

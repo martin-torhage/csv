@@ -21,7 +21,7 @@ defmodule Postgrex.MixProject do
   defp package() do
     [
       name: "csve",
-      licenses: ["MIT", "LGPL"],
+      licenses: ["MIT", "LGPL-2.1-only"],
       maintainers: ["Martin Torhage"],
       links: %{"GitHub" => "https://github.com/martin-torhage/csv"},
       files: ["LICENSE",
