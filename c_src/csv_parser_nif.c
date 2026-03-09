@@ -7,9 +7,15 @@
 #define OPTION_DELIM_TABS 1
 #define OPTION_RETURN_BINARY 2
 
+#if __STDC_VERSION__ >= 202311L
+// C23 and later
+#include <stdbool.h>
+#else
+// Pre-C23
 typedef int bool;
 #define true 1
 #define false 0
+#endif
 
 #define MAX_PARSE_SIZE 128
 // Empty lines are filtered out by libcsv (default behaviour). Each
