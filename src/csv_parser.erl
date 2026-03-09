@@ -29,6 +29,16 @@ parse(_) ->
 %% Internal
 
 init_nif() ->
-    File = filename:join([code:priv_dir(csv),
-                          "csv_parser_nif"]),
-    ok = erlang:load_nif(File, 0).
+    SoFileName = filename:join([priv_dir(),
+                                "csv_parser_nif"]),
+    ok = erlang:load_nif(SoFileName, 0).
+
+priv_dir() ->
+    case code:priv_dir(?MODULE) of
+        {error, bad_name} ->
+            %% Development mode fallback: assume priv/ is sibling to ebin/
+            EbinDir = filename:dirname(code:which(?MODULE)),
+            filename:join(EbinDir, "../priv");
+        Path when is_list(Path) ->
+            Path
+    end.
