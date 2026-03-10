@@ -9,7 +9,7 @@ defmodule Postgrex.MixProject do
       start_permanent: Mix.env == :prod,
       description: "Fast Erlang NIF-based CSV parser using libcsv",
       package: package(),
-      deps: [{:ex_doc, "~> 0.18.0", only: :dev}],
+      deps: [],
       source_url: "https://github.com/martin-torhage/csv"
     ]
   end
