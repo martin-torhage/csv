@@ -11,5 +11,6 @@
                  ]},
   {env, []},
   {licenses, ["MIT", "LGPL-2.1-only"]},
-  {pkg_name, "csve"}
+  {pkg_name, "csve"},
+  {links, [{"GitHub", "https://github.com/martin-torhage/csv"}]}
  ]}.
