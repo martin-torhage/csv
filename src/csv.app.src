@@ -10,5 +10,6 @@
                   stdlib
                  ]},
   {env, []},
-  {licenses, ["MIT", "LGPL-2.1-only"]}
+  {licenses, ["MIT", "LGPL-2.1-only"]},
+  {pkg_name, "csve"}
  ]}.
